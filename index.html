@@ -223,6 +223,24 @@
       color: #b5706a;
     }
 
+    /* ── PHASE 7: BREAKOUT AREA MAP ── */
+    .face-map { display: block; }
+    .face-outline { fill: #faf3ef; stroke: rgba(212,144,138,0.4); stroke-width: 2; }
+    .face-feature { fill: none; stroke: rgba(180,150,140,0.35); stroke-width: 2; stroke-linecap: round; }
+    .face-region {
+      fill: rgba(212,144,138,0.10);
+      stroke: rgba(212,144,138,0.25);
+      stroke-width: 1.5;
+      cursor: pointer;
+      transition: fill 0.15s, stroke 0.15s;
+    }
+    .face-region:active { fill: rgba(212,144,138,0.22); }
+    .face-region.active-region {
+      fill: rgba(212,144,138,0.55);
+      stroke: #b5706a;
+      stroke-width: 2;
+    }
+
     /* Notes textarea */
     .skin-textarea {
       background: rgba(255,255,255,0.7);
@@ -736,6 +754,36 @@
             <span class="text-[10px] text-bark-muted font-medium">Reactive</span>
           </div>
         </div>
+      </div>
+
+      <!-- ── BREAKOUT AREA MAP ── -->
+      <div class="card rounded-3xl p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <p class="text-xs font-semibold text-bark-muted uppercase tracking-widest">Breakout Areas</p>
+          <span class="text-[10px] text-bark-muted font-medium">Optional</span>
+        </div>
+        <div class="flex justify-center">
+          <svg id="face-map" viewBox="0 0 200 240" width="220" height="264" role="group" aria-label="Tap the areas where you have breakouts today">
+            <!-- Base silhouette + minimal features (decorative, non-interactive) -->
+            <path class="face-outline" pointer-events="none"
+              d="M100 10 C150 10 180 60 180 120 C180 190 145 230 100 230 C55 230 20 190 20 120 C20 60 50 10 100 10 Z"/>
+            <ellipse class="face-feature" cx="75" cy="95" rx="6" ry="7" pointer-events="none"/>
+            <ellipse class="face-feature" cx="125" cy="95" rx="6" ry="7" pointer-events="none"/>
+            <path class="face-feature" d="M85 178 Q100 186 115 178" pointer-events="none"/>
+
+            <!-- Tappable regions -->
+            <ellipse class="face-region" data-region="forehead" cx="100" cy="55" rx="55" ry="28" onclick="toggleBreakoutArea(this)"/>
+            <ellipse class="face-region" data-region="left-cheek" cx="50" cy="135" rx="26" ry="38" onclick="toggleBreakoutArea(this)"/>
+            <ellipse class="face-region" data-region="right-cheek" cx="150" cy="135" rx="26" ry="38" onclick="toggleBreakoutArea(this)"/>
+            <ellipse class="face-region" data-region="nose" cx="100" cy="138" rx="15" ry="30" onclick="toggleBreakoutArea(this)"/>
+            <ellipse class="face-region" data-region="chin" cx="100" cy="205" rx="30" ry="23" onclick="toggleBreakoutArea(this)"/>
+            <path class="face-region" data-region="jawline" onclick="toggleBreakoutArea(this)"
+              d="M40 150 Q23 195 78 226 L94 212 Q48 187 54 157 Z
+                 M160 150 Q177 195 122 226 L106 212 Q152 187 146 157 Z"/>
+          </svg>
+        </div>
+        <p id="breakout-areas-summary" class="text-[11px] text-bark-muted text-center min-h-[16px]">Tap the diagram to mark areas</p>
+        <p class="text-[10px] text-bark-muted text-center opacity-70">As shown, facing you</p>
       </div>
 
       <!-- ── ROUTINE TOGGLES ── -->
@@ -1339,6 +1387,11 @@
     const BREAKOUT_COLORS = ['','#d4908a','#c77c74','#b8685e','#a85450','#943f3a'];
     const REDNESS_COLORS  = ['','#8fa88a','#7a9a74','#668b60','#527a4c','#3e693a'];
     const SLEEP_EMOJI     = { poor:'😞', fair:'😐', good:'🙂', great:'😄', 'not set':'—' };
+    const FACE_REGIONS = ['forehead', 'left-cheek', 'right-cheek', 'nose', 'chin', 'jawline'];
+    const FACE_REGION_LABELS = {
+      forehead: 'Forehead', 'left-cheek': 'Left Cheek', 'right-cheek': 'Right Cheek',
+      nose: 'Nose', chin: 'Chin', jawline: 'Jawline',
+    };
 
     /** Escapes HTML-significant characters before text goes into innerHTML.
      *  Every field a user can type (name, notes, triggers) must pass through
@@ -1455,6 +1508,7 @@
           migrated = true;
         }
         if (!l.products) { l.products = {}; migrated = true; }
+        if (!l.breakoutAreas) { l.breakoutAreas = []; migrated = true; }
       });
       if (migrated) saveLogs(arr);
       return arr;
@@ -1541,6 +1595,16 @@
     function getPhotoEntries() {
       return getLogs().filter(l => l.photo).sort((a, b) => a.dateKey.localeCompare(b.dateKey));
     }
+
+    /** How often each face region was marked, across a given set of entries,
+     *  sorted most- to least-frequent — used by the export report. */
+    function computeAreaFrequency(logs) {
+      const counts = Object.fromEntries(FACE_REGIONS.map(r => [r, 0]));
+      logs.forEach(l => (l.breakoutAreas || []).forEach(r => { if (r in counts) counts[r]++; }));
+      return FACE_REGIONS
+        .map(r => ({ region: r, label: FACE_REGION_LABELS[r], count: counts[r], pct: logs.length ? Math.round(counts[r] / logs.length * 100) : 0 }))
+        .sort((a, b) => b.count - a.count);
+    }
     function trendArrow(vals) {
       if (vals.length < 2) return { arrow:'—', color:'#9e8a80', label:'Insufficient data' };
       const first = vals.slice(0, Math.ceil(vals.length/2));
@@ -1625,6 +1689,32 @@
       const active = document.querySelectorAll('.routine-toggle.active-am, .routine-toggle.active-pm').length;
       document.getElementById('routine-count').textContent    = `${active} / ${total}`;
       document.getElementById('routine-progress').style.width = `${(active / total) * 100}%`;
+    }
+
+    /* ══════════════════════════════════════════════
+       BREAKOUT AREA MAP — tappable face diagram, presence/absence only
+       (severity is still captured by the Breakout Severity slider above it)
+    ══════════════════════════════════════════════ */
+    function toggleBreakoutArea(el) {
+      const region = el.dataset.region;
+      const willActivate = !el.classList.contains('active-region');
+      document.querySelectorAll(`.face-region[data-region="${region}"]`)
+        .forEach(e => e.classList.toggle('active-region', willActivate));
+      renderBreakoutAreaSummary();
+    }
+    function getActiveBreakoutAreas() {
+      return [...new Set([...document.querySelectorAll('.face-region.active-region')].map(e => e.dataset.region))];
+    }
+    function setBreakoutAreas(areas) {
+      const active = new Set(areas || []);
+      document.querySelectorAll('.face-region').forEach(e => e.classList.toggle('active-region', active.has(e.dataset.region)));
+      renderBreakoutAreaSummary();
+    }
+    function renderBreakoutAreaSummary() {
+      const el = document.getElementById('breakout-areas-summary');
+      if (!el) return;
+      const areas = getActiveBreakoutAreas();
+      el.textContent = areas.length ? areas.map(a => FACE_REGION_LABELS[a]).join(' · ') : 'Tap the diagram to mark areas';
     }
 
     /* ══════════════════════════════════════════════
@@ -2014,6 +2104,7 @@
       const rSlider = document.getElementById('redness-slider');
       bSlider.value = 1; updateSlider('breakout', 1);
       rSlider.value = 1; updateSlider('redness', 1);
+      setBreakoutAreas([]);
       document.querySelectorAll('.routine-toggle').forEach(b => b.classList.remove('active-am', 'active-pm'));
       updateRoutineProgress();
       document.getElementById('note-diet').value = '';
@@ -2042,6 +2133,7 @@
       const rSlider = document.getElementById('redness-slider');
       bSlider.value = entry.breakout; updateSlider('breakout', entry.breakout);
       rSlider.value = entry.redness;  updateSlider('redness', entry.redness);
+      setBreakoutAreas(entry.breakoutAreas);
 
       document.querySelectorAll('.routine-toggle').forEach(b => {
         b.classList.remove('active-am', 'active-pm');
@@ -2144,6 +2236,7 @@
           date,
           breakout: document.getElementById('breakout-slider').value,
           redness:  document.getElementById('redness-slider').value,
+          breakoutAreas: getActiveBreakoutAreas(),
           routine:  [...document.querySelectorAll('.routine-toggle.active-am,.routine-toggle.active-pm')]
                       .map(b => `${b.dataset.step}-${b.dataset.period}`),
           diet:     document.getElementById('note-diet').value,
@@ -2315,6 +2408,7 @@
               ${entry.triggers ? `<span class="text-[10px] text-bark-muted flex-1 line-clamp-1">⚡ ${escapeHtml(entry.triggers)}</span>` : ''}
             </div>
             ${entry.diet ? `<p class="text-[10px] text-bark-muted mt-1.5 line-clamp-1">🥗 ${escapeHtml(entry.diet)}</p>` : ''}
+            ${(entry.breakoutAreas||[]).length ? `<div class="flex flex-wrap gap-1 mt-2">${entry.breakoutAreas.map(a => `<span class="text-[9px] font-semibold px-2 py-0.5 rounded-full" style="background:#f2e0de;color:#b5706a">${escapeHtml(FACE_REGION_LABELS[a]||a)}</span>`).join('')}</div>` : ''}
 
             ${entry.photo ? `
             <!-- Phase 5: progress photo thumbnail -->
@@ -2453,6 +2547,27 @@
         </table>
         <p style="font-size:10px;color:#9e8a80;margin:8px 0 0;font-style:italic;">Correlational only — reflects entries logged while a product was tagged, not a clinical conclusion about efficacy.</p>`;
 
+      /* — affected-area frequency across the exported range — */
+      const areaFrequency = computeAreaFrequency(logs);
+      const areaHasData = areaFrequency.some(a => a.count > 0);
+      const areaTableRows = areaFrequency.map(a => `
+        <tr>
+          <td style="font-weight:600">${escapeHtml(a.label)}</td>
+          <td>${a.count} of ${logs.length}</td>
+          <td>${a.pct}%</td>
+        </tr>`).join('');
+      const areaSectionHtml = !areaHasData ? `
+        <div style="background:#faf7f4;border-radius:12px;padding:18px;text-align:center;font-size:12px;color:#9e8a80;">
+          No breakout areas were marked during this observation period.
+        </div>` : `
+        <table class="report-table" style="border:1px solid #f2e0de;border-radius:12px;overflow:hidden;">
+          <thead>
+            <tr><th>Area</th><th>Days Logged</th><th>% of Entries</th></tr>
+          </thead>
+          <tbody>${areaTableRows}</tbody>
+        </table>
+        <p style="font-size:10px;color:#9e8a80;margin:8px 0 0;font-style:italic;">Self-reported location, facing the patient. Not a substitute for clinical examination.</p>`;
+
       meta.textContent = `Observation period: ${minDate} – ${maxDate}  ·  ${logs.length} entries  ·  Generated ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}`;
 
       /* — build report sections — */
@@ -2499,26 +2614,32 @@
           </table>
         </section>
 
-        <!-- SECTION 3: Diet & Trigger Notes -->
+        <!-- SECTION 3: Affected Areas Summary -->
         <section>
-          <p class="report-section-title">3. Dietary & Lifestyle Notes</p>
+          <p class="report-section-title">3. Affected Areas Summary</p>
+          ${areaSectionHtml}
+        </section>
+
+        <!-- SECTION 4: Diet & Trigger Notes -->
+        <section>
+          <p class="report-section-title">4. Dietary & Lifestyle Notes</p>
           <div style="background:#faf7f4;border-radius:12px;padding:14px;font-size:12px;color:#3a2e28;line-height:1.7;white-space:pre-wrap;">${allDiet || 'No dietary notes recorded.'}</div>
         </section>
 
         <section>
-          <p class="report-section-title">4. Reported Flare-up Triggers</p>
+          <p class="report-section-title">5. Reported Flare-up Triggers</p>
           <div style="background:#fef2f2;border-radius:12px;padding:14px;font-size:12px;color:#3a2e28;line-height:1.7;white-space:pre-wrap;">${allTriggers || 'No triggers recorded.'}</div>
         </section>
 
-        <!-- SECTION 5: Products in Use -->
+        <!-- SECTION 6: Products in Use -->
         <section>
-          <p class="report-section-title">5. Products in Use</p>
+          <p class="report-section-title">6. Products in Use</p>
           ${productsSectionHtml}
         </section>
 
-        <!-- SECTION 6: Chronological Log -->
+        <!-- SECTION 7: Chronological Log -->
         <section>
-          <p class="report-section-title">6. Chronological Entry Log</p>
+          <p class="report-section-title">7. Chronological Entry Log</p>
           <div style="overflow-x:auto;border-radius:12px;border:1px solid #f2e0de;">
             <table class="report-table" style="min-width:480px">
               <thead>
@@ -2557,12 +2678,12 @@
           </p>
         </section>
 
-        <!-- SECTION 7: Visual Progress Gallery -->
+        <!-- SECTION 8: Visual Progress Gallery -->
         ${(function(){
           const photoLogs = [...logs].reverse().filter(l => l.photo);
           if (photoLogs.length === 0) return `
             <section>
-              <p class="report-section-title">7. Visual Progress Gallery</p>
+              <p class="report-section-title">8. Visual Progress Gallery</p>
               <div style="background:#faf7f4;border-radius:12px;padding:18px;text-align:center;font-size:12px;color:#9e8a80;">
                 No progress photos were recorded during this observation period.
               </div>
@@ -2598,7 +2719,7 @@
 
           return `
             <section style="page-break-before:auto;">
-              <p class="report-section-title">7. Visual Progress Gallery</p>
+              <p class="report-section-title">8. Visual Progress Gallery</p>
               <p style="font-size:11px;color:#9e8a80;margin:0 0 12px;">
                 ${photoLogs.length} progress photo${photoLogs.length > 1 ? 's' : ''} recorded
                 (earliest → most recent). Photos compressed and stored locally via SkinLog.
@@ -2714,6 +2835,7 @@
             <span class="chip px-3 py-1.5 rounded-xl text-xs font-semibold text-blush-dark">🔴 Breakout: ${bLabel}</span>
             <span class="bg-sage-light border border-sage/20 px-3 py-1.5 rounded-xl text-xs font-semibold text-sage-dark">🌡️ Redness: ${rLabel}</span>
             ${todayEntry.sleep && todayEntry.sleep !== 'not set' ? `<span class="bg-white/70 border border-blush/15 px-3 py-1.5 rounded-xl text-xs font-semibold text-bark-muted">${SLEEP_EMOJI[todayEntry.sleep]} Sleep: ${escapeHtml(todayEntry.sleep)}</span>` : ''}
+            ${(todayEntry.breakoutAreas||[]).length ? `<span class="bg-white/70 border border-blush/15 px-3 py-1.5 rounded-xl text-xs font-semibold text-bark-muted">📍 ${todayEntry.breakoutAreas.map(a => escapeHtml(FACE_REGION_LABELS[a]||a)).join(', ')}</span>` : ''}
           </div>
           <div class="h-1.5 bg-blush-light rounded-full overflow-hidden mb-1">
             <div class="h-full rounded-full bg-gradient-to-r from-sage to-sage-dark" style="width:${routinePct}%"></div>
@@ -3001,6 +3123,7 @@
               date:     l.date || new Date().toLocaleDateString(),
               breakout: l.breakout ?? '1',
               redness:  l.redness ?? '1',
+              breakoutAreas: Array.isArray(l.breakoutAreas) ? l.breakoutAreas : [],
               routine:  Array.isArray(l.routine) ? l.routine : [],
               diet:     l.diet || '',
               triggers: l.triggers || '',
