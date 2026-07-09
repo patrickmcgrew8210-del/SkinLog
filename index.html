@@ -609,6 +609,16 @@
         </div>
       </div>
 
+      <!-- ── REMINDER BANNER (dismissible, dateKey-driven) ── -->
+      <div id="reminder-banner" class="fade-up delay-2 hidden flex items-center gap-3 chip px-4 py-3.5 rounded-2xl cursor-pointer" onclick="openLogForToday()">
+        <span class="text-lg">✦</span>
+        <p class="flex-1 text-xs font-semibold text-blush-dark" id="reminder-banner-text"></p>
+        <button type="button" onclick="event.stopPropagation(); dismissReminderBanner()" aria-label="Dismiss reminder"
+          class="w-6 h-6 rounded-full flex items-center justify-center active:scale-90 transition-transform text-blush-dark/70">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
       <!-- ── TODAY'S SKIN STATUS ── -->
       <div class="fade-up delay-3 card rounded-3xl p-5 relative overflow-hidden">
         <div class="absolute -left-8 -bottom-8 w-32 h-32 rounded-full bg-sage-light opacity-40 blur-2xl pointer-events-none"></div>
@@ -965,6 +975,16 @@
             <button class="sleep-btn flex-1 py-2 rounded-xl text-xs font-bold border-2 border-transparent bg-white/70 text-bark-muted active:scale-95 transition-all" data-sleep="good"   onclick="setSleep(this)">🙂 Good</button>
             <button class="sleep-btn flex-1 py-2 rounded-xl text-xs font-bold border-2 border-transparent bg-white/70 text-bark-muted active:scale-95 transition-all" data-sleep="great"  onclick="setSleep(this)">😄 Great</button>
           </div>
+        </div>
+
+        <!-- Cycle Day (optional; shown only when enabled in account settings) -->
+        <div id="cycle-day-field" class="hidden">
+          <label class="flex items-center gap-2 text-sm font-semibold text-bark mb-2">
+            <span class="w-6 h-6 rounded-lg bg-pink-50 flex items-center justify-center text-xs">🩸</span>
+            Day of Cycle <span class="text-bark-muted font-normal">(optional)</span>
+          </label>
+          <input id="cycle-day-input" type="number" min="1" max="40" inputmode="numeric"
+            class="skin-textarea w-full px-4 py-3" placeholder="e.g. 14" />
         </div>
 
         <!-- Triggers / Free notes -->
@@ -1509,6 +1529,7 @@
         }
         if (!l.products) { l.products = {}; migrated = true; }
         if (!l.breakoutAreas) { l.breakoutAreas = []; migrated = true; }
+        if (l.cycleDay === undefined) { l.cycleDay = null; migrated = true; }
       });
       if (migrated) saveLogs(arr);
       return arr;
@@ -1589,6 +1610,61 @@
       };
     }
 
+    /* ══════════════════════════════════════════════
+       TRIGGER KEYWORD CORRELATION — no NLP/LLM, just word frequency +
+       before/after severity, mirroring computeProductImpact()'s shape.
+       Scoped to entry.triggers only (not diet) — the triggers textarea
+       already promises this in its caption text.
+    ══════════════════════════════════════════════ */
+    const TRIGGER_STOPWORDS = new Set([
+      'a','an','the','and','or','but','of','to','in','on','at','for','with','from','by',
+      'is','was','were','are','be','been','being','it','its','this','that','these','those',
+      'i','me','my','we','our','you','your',
+      'today','yesterday','day','days','felt','feel','feeling',
+      'very','really','just','also','so','too','not','no','yes',
+      'got','get','had','have','went','doing','did','still','again','maybe','kind',
+    ]);
+
+    /** Lowercase, strip punctuation, drop stopwords + very short words. */
+    function tokenizeTriggerText(text) {
+      return (text || '')
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+        .split(/\s+/)
+        .filter(w => w.length >= 3 && !TRIGGER_STOPWORDS.has(w));
+    }
+
+    /** Top `limit` keyword→severity correlations across all trigger notes.
+     *  Correlational, not causal: avg breakout on days a word appears vs.
+     *  days it doesn't, mirroring computeProductImpact()'s before/after
+     *  shape. Requires >=3 entries on each side (same bar as
+     *  computeProductImpact), plus a minimum |delta| of 0.3 — the same
+     *  "meaningful change" cutoff trendArrow() already uses — since this
+     *  auto-surfaces on the Dashboard rather than being looked up on
+     *  demand, so noise needs its own floor before it's shown. */
+    function computeTopTriggerPatterns(logs, limit = 2) {
+      const MIN_MENTIONS = 3;
+      const MIN_DELTA = 0.3;
+      const tokenized = logs.map(l => ({ entry: l, words: new Set(tokenizeTriggerText(l.triggers)) }));
+      const counts = new Map();
+      tokenized.forEach(({ words }) => words.forEach(w => counts.set(w, (counts.get(w) || 0) + 1)));
+
+      const candidates = [];
+      counts.forEach((count, word) => {
+        if (count < MIN_MENTIONS) return;
+        const withArr    = tokenized.filter(t => t.words.has(word)).map(t => t.entry);
+        const withoutArr = tokenized.filter(t => !t.words.has(word)).map(t => t.entry);
+        if (withoutArr.length < MIN_MENTIONS) return;
+        const withB    = parseFloat(avg(withArr.map(l => parseInt(l.breakout))));
+        const withoutB = parseFloat(avg(withoutArr.map(l => parseInt(l.breakout))));
+        const delta = withB - withoutB;
+        if (Math.abs(delta) < MIN_DELTA) return;
+        candidates.push({ word, count, withBreakout: withB, withoutBreakout: withoutB, delta });
+      });
+
+      return candidates.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, limit);
+    }
+
     /** All entries with a progress photo, oldest → newest — the single
      *  source of truth for both the History compare CTA and the compare
      *  modal's date picker. */
@@ -1605,6 +1681,35 @@
         .map(r => ({ region: r, label: FACE_REGION_LABELS[r], count: counts[r], pct: logs.length ? Math.round(counts[r] / logs.length * 100) : 0 }))
         .sort((a, b) => b.count - a.count);
     }
+
+    /* ══════════════════════════════════════════════
+       CYCLE TRACKING — opt-in, off by default. A plain data point
+       (entry.cycleDay, 1-40) with no predictions or calendar math.
+    ══════════════════════════════════════════════ */
+    function isCycleTrackingEnabled() {
+      return localStorage.getItem('skinlog-cycle-tracking-enabled') === '1';
+    }
+    function syncCycleFieldVisibility() {
+      document.getElementById('cycle-day-field')?.classList.toggle('hidden', !isCycleTrackingEnabled());
+    }
+    /** Reads/validates the cycle-day input; when tracking is currently
+     *  disabled, falls back to the entry's existing value so re-saving an
+     *  entry while the field is hidden doesn't silently wipe it. */
+    function readCycleDayInput(editingEntry) {
+      if (!isCycleTrackingEnabled()) return editingEntry?.cycleDay ?? null;
+      const v = parseInt(document.getElementById('cycle-day-input')?.value, 10);
+      return (Number.isInteger(v) && v >= 1 && v <= 40) ? v : null;
+    }
+    function toggleCycleTracking() {
+      const next = !isCycleTrackingEnabled();
+      if (next) localStorage.setItem('skinlog-cycle-tracking-enabled', '1');
+      else localStorage.removeItem('skinlog-cycle-tracking-enabled');
+      const stateEl = document.getElementById('cycle-toggle-state');
+      if (stateEl) { stateEl.textContent = next ? 'ON' : 'OFF'; stateEl.style.color = next ? '#607a5c' : '#9e8a80'; }
+      syncCycleFieldVisibility();
+      showToast(next ? 'Cycle day tracking on' : 'Cycle day tracking off', 'success');
+    }
+
     function trendArrow(vals) {
       if (vals.length < 2) return { arrow:'—', color:'#9e8a80', label:'Insufficient data' };
       const first = vals.slice(0, Math.ceil(vals.length/2));
@@ -2109,6 +2214,8 @@
       updateRoutineProgress();
       document.getElementById('note-diet').value = '';
       document.getElementById('note-triggers').value = '';
+      document.getElementById('cycle-day-input').value = '';
+      syncCycleFieldVisibility();
       document.querySelectorAll('.sleep-btn').forEach(b => { b.style.background = b.style.borderColor = b.style.color = ''; });
 
       const input = document.getElementById('log-photo-input');
@@ -2144,6 +2251,8 @@
 
       document.getElementById('note-diet').value = entry.diet || '';
       document.getElementById('note-triggers').value = entry.triggers || '';
+      document.getElementById('cycle-day-input').value = entry.cycleDay ?? '';
+      syncCycleFieldVisibility();
 
       document.querySelectorAll('.sleep-btn').forEach(b => {
         b.style.background = b.style.borderColor = b.style.color = '';
@@ -2241,6 +2350,7 @@
                       .map(b => `${b.dataset.step}-${b.dataset.period}`),
           diet:     document.getElementById('note-diet').value,
           triggers: document.getElementById('note-triggers').value,
+          cycleDay: readCycleDayInput(editing),
           sleep:    document.querySelector('.sleep-btn[style*="background"]')?.dataset.sleep || 'not set',
           photo:    photoDataUrl || null,   // compressed JPEG data URL or null
           products: { ..._formProducts, other: [..._formProducts.other] },
@@ -2408,7 +2518,10 @@
               ${entry.triggers ? `<span class="text-[10px] text-bark-muted flex-1 line-clamp-1">⚡ ${escapeHtml(entry.triggers)}</span>` : ''}
             </div>
             ${entry.diet ? `<p class="text-[10px] text-bark-muted mt-1.5 line-clamp-1">🥗 ${escapeHtml(entry.diet)}</p>` : ''}
-            ${(entry.breakoutAreas||[]).length ? `<div class="flex flex-wrap gap-1 mt-2">${entry.breakoutAreas.map(a => `<span class="text-[9px] font-semibold px-2 py-0.5 rounded-full" style="background:#f2e0de;color:#b5706a">${escapeHtml(FACE_REGION_LABELS[a]||a)}</span>`).join('')}</div>` : ''}
+            ${(entry.breakoutAreas||[]).length || entry.cycleDay ? `<div class="flex flex-wrap gap-1 mt-2">
+              ${entry.cycleDay ? `<span class="text-[9px] font-semibold px-2 py-0.5 rounded-full" style="background:#fce7f3;color:#9d174d">Day ${entry.cycleDay}</span>` : ''}
+              ${entry.breakoutAreas.map(a => `<span class="text-[9px] font-semibold px-2 py-0.5 rounded-full" style="background:#f2e0de;color:#b5706a">${escapeHtml(FACE_REGION_LABELS[a]||a)}</span>`).join('')}
+            </div>` : ''}
 
             ${entry.photo ? `
             <!-- Phase 5: progress photo thumbnail -->
@@ -2744,6 +2857,19 @@
       if (e.target === document.getElementById('export-modal')) closeExportModal();
     }
 
+    /** True if today has no entry yet and the reminder hasn't been
+     *  dismissed today. dateKey-driven (not the older `.date` locale
+     *  string) so it can't be fooled by locale formatting quirks. */
+    function shouldShowReminder(logs, now) {
+      const todayKey = isoDate(now);
+      if (logs.some(l => l.dateKey === todayKey)) return false;
+      return localStorage.getItem('skinlog-reminder-dismissed-date') !== todayKey;
+    }
+    function dismissReminderBanner() {
+      localStorage.setItem('skinlog-reminder-dismissed-date', isoDate(new Date()));
+      document.getElementById('reminder-banner')?.classList.add('hidden');
+    }
+
     /* ══════════════════════════════════════════════
        DASHBOARD HYDRATION — reads real localStorage data
     ══════════════════════════════════════════════ */
@@ -2757,12 +2883,21 @@
 
       // ── Streak calculation ──
       let streak = 0;
-      const todayStr = now.toLocaleDateString();
       // Walk backwards day by day from today
       for (let i = 0; i < 60; i++) {
         const d = new Date(now); d.setDate(now.getDate() - i);
         const ds = d.toLocaleDateString();
         if (logs.find(l => l.date === ds)) { streak++; } else { break; }
+      }
+      // Streak as of yesterday (excludes today) — used only for the reminder
+      // banner's message. The main `streak` above intentionally reads 0 the
+      // moment today is unlogged (that's what the streak ring should show),
+      // but the banner needs to know whether there's a streak actually at
+      // risk of breaking, so it walks starting one day earlier.
+      let priorStreak = 0;
+      for (let i = 1; i <= 60; i++) {
+        const d = new Date(now); d.setDate(now.getDate() - i);
+        if (logs.some(l => l.dateKey === isoDate(d))) { priorStreak++; } else { break; }
       }
 
       const streakNum = document.getElementById('streak-number');
@@ -2811,10 +2946,22 @@
       }
 
       // ── Today's skin status ──
-      const todayEntry = logs.find(l => l.date === todayStr);
+      const todayEntry = logs.find(l => l.dateKey === isoDate(now));
       const summaryEl  = document.getElementById('dashboard-today-summary');
       const badgeEl    = document.getElementById('dashboard-log-badge');
       const statusEl   = document.getElementById('dashboard-log-status');
+
+      // ── Reminder banner ──
+      const banner = document.getElementById('reminder-banner');
+      if (banner) {
+        const show = shouldShowReminder(logs, now);
+        banner.classList.toggle('hidden', !show);
+        if (show) {
+          document.getElementById('reminder-banner-text').textContent = priorStreak > 0
+            ? `Keep your ${priorStreak}-day streak alive — log today's entry.`
+            : `Start your streak — log your first entry today.`;
+        }
+      }
 
       if (todayEntry && summaryEl) {
         const bv = parseInt(todayEntry.breakout);
@@ -2836,6 +2983,7 @@
             <span class="bg-sage-light border border-sage/20 px-3 py-1.5 rounded-xl text-xs font-semibold text-sage-dark">🌡️ Redness: ${rLabel}</span>
             ${todayEntry.sleep && todayEntry.sleep !== 'not set' ? `<span class="bg-white/70 border border-blush/15 px-3 py-1.5 rounded-xl text-xs font-semibold text-bark-muted">${SLEEP_EMOJI[todayEntry.sleep]} Sleep: ${escapeHtml(todayEntry.sleep)}</span>` : ''}
             ${(todayEntry.breakoutAreas||[]).length ? `<span class="bg-white/70 border border-blush/15 px-3 py-1.5 rounded-xl text-xs font-semibold text-bark-muted">📍 ${todayEntry.breakoutAreas.map(a => escapeHtml(FACE_REGION_LABELS[a]||a)).join(', ')}</span>` : ''}
+            ${todayEntry.cycleDay ? `<span class="bg-white/70 border border-blush/15 px-3 py-1.5 rounded-xl text-xs font-semibold text-bark-muted">🩸 Cycle day ${todayEntry.cycleDay}</span>` : ''}
           </div>
           <div class="h-1.5 bg-blush-light rounded-full overflow-hidden mb-1">
             <div class="h-full rounded-full bg-gradient-to-r from-sage to-sage-dark" style="width:${routinePct}%"></div>
@@ -2851,6 +2999,13 @@
         const rVals = logs.slice(0,7).map(l => parseInt(l.redness));
         const bTrend = trendArrow(bVals.reverse());
         const rTrend = trendArrow(rVals.reverse());
+        const patterns = computeTopTriggerPatterns(logs);
+        const patternsHtml = patterns.map(p => `
+            <div class="flex items-start gap-3 p-3 bg-white/70 rounded-2xl border border-blush/10">
+              <span class="text-lg mt-0.5">🔍</span>
+              <div><p class="text-sm font-semibold text-bark">"${escapeHtml(p.word)}" linked to ${p.delta > 0 ? 'higher' : 'lower'} breakout</p>
+              <p class="text-xs text-bark-muted mt-0.5">Avg ${p.withBreakout}/5 on days mentioned vs ${p.withoutBreakout}/5 when not &nbsp;·&nbsp; ${p.count} entries</p></div>
+            </div>`).join('');
         insightsEl.innerHTML = `
           <div class="space-y-2">
             <div class="flex items-start gap-3 p-3 bg-blush-light/40 rounded-2xl">
@@ -2863,6 +3018,8 @@
               <div><p class="text-sm font-semibold text-bark">Redness: ${rTrend.label}</p>
               <p class="text-xs text-bark-muted mt-0.5">7-day avg: ${avg(rVals)}/5 &nbsp;${rTrend.arrow}</p></div>
             </div>
+            ${patternsHtml}
+            ${patterns.length ? `<p class="text-[10px] text-bark-muted text-center italic pt-1">Based on your own notes — correlational, not a diagnosis.</p>` : ''}
           </div>`;
       } else if (insightsEl && logs.length > 0) {
         insightsEl.innerHTML = `<p class="text-xs text-bark-muted text-center py-3">Log at least 3 days to unlock trend insights.</p>`;
@@ -2885,6 +3042,7 @@
       updateSlider('breakout', 1);
       updateSlider('redness',  1);
       updateRoutineProgress();
+      syncCycleFieldVisibility();
 
       // Hydrate dashboard with real data
       hydrateDashboard();
@@ -3039,6 +3197,12 @@
           </button>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f0e8e6;">
+          <button id="cycle-toggle-btn" onclick="toggleCycleTracking()" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#7a6055;">
+            <span style="display:flex;align-items:center;gap:8px;">🩸 Cycle Day Tracking</span>
+            <span id="cycle-toggle-state" style="font-size:11px;font-weight:700;color:${isCycleTrackingEnabled() ? '#607a5c' : '#9e8a80'};">${isCycleTrackingEnabled() ? 'ON' : 'OFF'}</span>
+          </button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f0e8e6;">
           <button onclick="exportBackup()" style="width:100%;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#7a6055;">
             <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M7 10l5 5 5-5M12 15V3"/></svg>
             Export Backup
@@ -3075,6 +3239,7 @@
         entries: getLogs(),
         products: getProducts(),
         currentProducts: getCurrentProducts(),
+        cycleTrackingEnabled: isCycleTrackingEnabled(),
       };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -3127,17 +3292,23 @@
               routine:  Array.isArray(l.routine) ? l.routine : [],
               diet:     l.diet || '',
               triggers: l.triggers || '',
+              cycleDay: (Number.isInteger(l.cycleDay) && l.cycleDay >= 1 && l.cycleDay <= 40) ? l.cycleDay : null,
               sleep:    l.sleep || 'not set',
               photo:    l.photo || null,
               products: l.products || {},
             }));
             if (!saveLogs(cleaned)) return;
             if (data.username) setUserName(data.username);
-            // Only touch products if the backup actually has them — an
-            // old-format backup predating this feature shouldn't wipe
-            // whatever products are already tracked.
+            // Only touch products/cycle setting if the backup actually has
+            // them — an old-format backup predating these features
+            // shouldn't wipe whatever's already tracked/configured.
             if (Array.isArray(data.products)) saveProducts(data.products);
             if (data.currentProducts) saveCurrentProducts(data.currentProducts);
+            if (typeof data.cycleTrackingEnabled === 'boolean') {
+              if (data.cycleTrackingEnabled) localStorage.setItem('skinlog-cycle-tracking-enabled', '1');
+              else localStorage.removeItem('skinlog-cycle-tracking-enabled');
+              syncCycleFieldVisibility();
+            }
             renderHistory();
             hydrateDashboard();
             showToast('Backup restored', 'success');
