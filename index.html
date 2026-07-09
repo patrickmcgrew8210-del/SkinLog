@@ -363,6 +363,44 @@
       pointer-events: none;
     }
 
+    /* ── PHASE 8: TRENDS VIEW ── */
+
+    /* Range selector chips */
+    .range-chip {
+      font-size: 12px; font-weight: 700;
+      padding: 9px 0; border-radius: 12px;
+      text-align: center;
+      background: rgba(255,255,255,0.65);
+      border: 1.5px solid rgba(212,144,138,0.18);
+      color: #9e8a80;
+      transition: all 0.15s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .range-chip:active { transform: scale(0.95); }
+    .range-chip.active-range {
+      background: linear-gradient(135deg, #d4908a, #b5706a);
+      border-color: #b5706a;
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(212,144,138,0.35);
+    }
+
+    /* Line chart */
+    #trends-chart-wrap { width: 100%; }
+    #trends-chart { display: block; height: 140px; }
+    .trend-line { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+    .trend-area { stroke: none; opacity: 0.12; }
+    .trend-gridline { stroke: rgba(212,144,138,0.15); stroke-width: 1; }
+
+    /* Calendar heatmap */
+    .heatmap-col { display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; }
+    .heatmap-cell {
+      width: 11px; height: 11px; border-radius: 3px;
+      background: #f2e0de;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .heatmap-cell:active { transform: scale(1.3); }
+    .heatmap-cell.is-empty { background: rgba(212,144,138,0.06); cursor: default; }
+
     /* Photo lightbox overlay */
     .photo-lightbox {
       position: fixed; inset: 0; z-index: 300;
@@ -1102,6 +1140,93 @@
     </main>
     <!-- end history view -->
 
+    <!-- ════════════════════════════
+         TRENDS VIEW (Phase 8)
+    ═════════════════════════════ -->
+    <main id="view-trends" class="view hidden-view px-5 pt-4 pb-6 space-y-5">
+
+      <!-- ── TRENDS HEADER ── -->
+      <header class="flex items-start justify-between">
+        <div>
+          <p class="text-bark-muted text-xs font-semibold uppercase tracking-widest">Skin Journey</p>
+          <h1 class="font-serif text-3xl text-bark leading-tight mt-0.5">
+            Your<br/><em class="not-italic font-semibold text-blush">Trends</em>
+          </h1>
+        </div>
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-blush-light to-blush-mid flex items-center justify-center shadow-sm flex-shrink-0 mt-1">
+          <svg class="w-5 h-5 text-blush-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 17l6-6 4 4 8-8M21 7v6h-6"/>
+          </svg>
+        </div>
+      </header>
+
+      <!-- ── RANGE SELECTOR ── -->
+      <div id="trends-range-selector" class="flex gap-2">
+        <button type="button" class="range-chip flex-1" data-range="7" onclick="setTrendsRange('7')">7D</button>
+        <button type="button" class="range-chip flex-1 active-range" data-range="30" onclick="setTrendsRange('30')">30D</button>
+        <button type="button" class="range-chip flex-1" data-range="90" onclick="setTrendsRange('90')">90D</button>
+        <button type="button" class="range-chip flex-1" data-range="all" onclick="setTrendsRange('all')">All</button>
+      </div>
+
+      <!-- ── EMPTY STATE ── -->
+      <div id="trends-empty" class="hidden card rounded-3xl p-8 text-center">
+        <div class="text-4xl mb-3">📈</div>
+        <h3 class="font-serif text-xl text-bark mb-1">Not enough data yet</h3>
+        <p class="text-sm text-bark-muted">Log a few more entries and your trends will start to take shape here.</p>
+      </div>
+
+      <div id="trends-content" class="space-y-5">
+
+        <!-- ── RANGE STATS ── -->
+        <div id="trends-stats" class="grid grid-cols-4 gap-2">
+          <!-- populated by renderTrends() -->
+        </div>
+
+        <!-- ── LINE CHART ── -->
+        <div class="card rounded-3xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-xs font-semibold text-bark-muted uppercase tracking-widest">Severity Over Time</p>
+            <div class="flex items-center gap-3 text-[10px] font-semibold">
+              <span class="flex items-center gap-1 text-blush-dark"><span class="w-2 h-2 rounded-full bg-blush inline-block"></span>Breakout</span>
+              <span class="flex items-center gap-1 text-sage-dark"><span class="w-2 h-2 rounded-full bg-sage inline-block"></span>Redness</span>
+            </div>
+          </div>
+          <div id="trends-chart-wrap">
+            <svg id="trends-chart" viewBox="0 0 320 140" class="w-full" preserveAspectRatio="none"></svg>
+          </div>
+          <div id="trends-chart-dates" class="flex justify-between text-[10px] text-bark-muted mt-1.5"></div>
+        </div>
+
+        <!-- ── CALENDAR HEATMAP ── -->
+        <div class="card rounded-3xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-xs font-semibold text-bark-muted uppercase tracking-widest">Breakout Heatmap</p>
+            <span id="trends-heatmap-selected" class="text-[11px] font-semibold text-blush-dark"></span>
+          </div>
+          <div id="trends-heatmap" class="flex gap-1 overflow-x-auto pb-1"></div>
+          <div class="flex items-center gap-1.5 mt-3 justify-end">
+            <span class="text-[9px] text-bark-muted font-medium">Clear</span>
+            <span class="w-3 h-3 rounded-sm" style="background:#f2e0de"></span>
+            <span class="w-3 h-3 rounded-sm" style="background:#e0b4b0"></span>
+            <span class="w-3 h-3 rounded-sm" style="background:#c77c74"></span>
+            <span class="w-3 h-3 rounded-sm" style="background:#943f3a"></span>
+            <span class="text-[9px] text-bark-muted font-medium">Severe</span>
+          </div>
+        </div>
+
+        <!-- ── INSIGHTS DIGEST ── -->
+        <div class="card rounded-3xl p-5">
+          <p class="text-xs font-semibold text-bark-muted uppercase tracking-widest mb-3">Patterns Worth Noting</p>
+          <div id="trends-insights" class="space-y-2">
+            <!-- populated by renderTrends() -->
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+    <!-- end trends view -->
+
   </div>
   <!-- end app shell -->
   <!-- ════════════════════════════════════════
@@ -1199,6 +1324,16 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
         </svg>
         <span class="text-[10px] font-semibold tracking-wide">Dashboard</span>
+      </button>
+
+      <!-- Trends -->
+      <button onclick="setNav('trends', this)"
+        class="nav-btn flex flex-col items-center gap-1 min-w-[64px] py-2 px-3 rounded-2xl nav-pill"
+        data-view="trends">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 17l6-6 4 4 8-8M21 7v6h-6"/>
+        </svg>
+        <span class="text-[10px] font-semibold tracking-wide">Trends</span>
       </button>
 
       <!-- Log (FAB-style center) -->
@@ -1401,7 +1536,7 @@
     /* ══════════════════════════════════════════════
        CONSTANTS & HELPERS
     ══════════════════════════════════════════════ */
-    const VIEWS = ['dashboard','log','history'];
+    const VIEWS = ['dashboard','log','history','trends'];
     const BREAKOUT_LABELS = ['','Clear','Mild','Moderate','Significant','Severe'];
     const REDNESS_LABELS  = ['','Calm','Faint','Noticeable','Inflamed','Reactive'];
     const BREAKOUT_COLORS = ['','#d4908a','#c77c74','#b8685e','#a85450','#943f3a'];
@@ -1754,6 +1889,7 @@
           window.scrollTo({ top: 0, behavior: 'smooth' });
           if (id === 'history')   renderHistory();
           if (id === 'dashboard') hydrateDashboard();
+          if (id === 'trends')    renderTrends();
         } else {
           el.classList.remove('active-view');
           el.classList.add('hidden-view');
@@ -2594,6 +2730,183 @@
           transition: height 0.5s ease;`;
         el.appendChild(bar);
       });
+    }
+
+    /* ══════════════════════════════════════════════
+       TRENDS VIEW (Phase 8) — longer-range charts, a calendar
+       heatmap, and a consolidated insights digest that reuses the
+       correlation math already built for products/triggers/areas
+       rather than inventing new stats.
+    ══════════════════════════════════════════════ */
+    let _trendsRange = '30'; // '7' | '30' | '90' | 'all'
+
+    function setTrendsRange(range) {
+      _trendsRange = range;
+      document.querySelectorAll('.range-chip').forEach(b => b.classList.toggle('active-range', b.dataset.range === range));
+      renderTrends();
+    }
+
+    /** Entries within the selected range, oldest → newest. */
+    function getEntriesInRange(logs, range) {
+      let entries = [...logs].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+      if (range === 'all') return entries;
+      const days = parseInt(range, 10);
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - (days - 1));
+      const cutoffKey = isoDate(cutoff);
+      return entries.filter(l => l.dateKey >= cutoffKey);
+    }
+
+    function renderTrends() {
+      document.querySelectorAll('.range-chip').forEach(b => b.classList.toggle('active-range', b.dataset.range === _trendsRange));
+
+      const logs = getLogs();
+      const entries = getEntriesInRange(logs, _trendsRange);
+      const empty = document.getElementById('trends-empty');
+      const content = document.getElementById('trends-content');
+
+      if (entries.length < 3) {
+        empty.classList.remove('hidden');
+        content.classList.add('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      content.classList.remove('hidden');
+
+      renderTrendsStats(entries);
+      renderTrendsChart(entries);
+      renderTrendsHeatmap(logs, _trendsRange);
+      renderTrendsInsights(entries);
+    }
+
+    function renderTrendsStats(entries) {
+      const statsEl = document.getElementById('trends-stats');
+      const bVals = entries.map(l => parseInt(l.breakout));
+      const rVals = entries.map(l => parseInt(l.redness));
+      const totalRoutineSteps = entries.reduce((acc, l) => acc + (l.routine?.length || 0), 0);
+      const avgRoutinePct = ((totalRoutineSteps / (entries.length * 7)) * 100).toFixed(0);
+      const stats = [
+        { label: 'Entries', value: entries.length, sub: 'logged', bg: '#f2e0de', color: '#b5706a' },
+        { label: 'Avg Break', value: avg(bVals), sub: 'out of 5', bg: '#f2e0de', color: '#943f3a' },
+        { label: 'Avg Red.', value: avg(rVals), sub: 'out of 5', bg: '#dde8db', color: '#607a5c' },
+        { label: 'Routine', value: avgRoutinePct + '%', sub: 'completed', bg: '#fef3c7', color: '#92400e' },
+      ];
+      statsEl.innerHTML = stats.map(s => `
+        <div class="rounded-2xl p-3 text-center" style="background:${s.bg}80">
+          <div class="font-serif text-xl font-semibold" style="color:${s.color}">${s.value}</div>
+          <div class="text-[9px] font-bold uppercase tracking-wider text-bark-muted leading-tight mt-0.5">${s.label}</div>
+          <div class="text-[9px] text-bark-muted">${s.sub}</div>
+        </div>`).join('');
+    }
+
+    function renderTrendsChart(entries) {
+      const svg = document.getElementById('trends-chart');
+      const W = 320, H = 140, PAD_X = 6, BASE_Y = 128, TOP_Y = 10;
+      const n = entries.length;
+      const xFor = (i) => n === 1 ? W / 2 : PAD_X + (i / (n - 1)) * (W - PAD_X * 2);
+      const yFor = (v) => BASE_Y - ((v - 1) / 4) * (BASE_Y - TOP_Y);
+
+      const bPoints = entries.map((l, i) => `${xFor(i)},${yFor(parseInt(l.breakout))}`).join(' ');
+      const rPoints = entries.map((l, i) => `${xFor(i)},${yFor(parseInt(l.redness))}`).join(' ');
+      const bArea = `M${xFor(0)},${BASE_Y} L${bPoints.split(' ').join(' L')} L${xFor(n - 1)},${BASE_Y} Z`;
+      const rArea = `M${xFor(0)},${BASE_Y} L${rPoints.split(' ').join(' L')} L${xFor(n - 1)},${BASE_Y} Z`;
+      const midY = yFor(3);
+
+      svg.innerHTML = `
+        <line class="trend-gridline" x1="${PAD_X}" y1="${midY}" x2="${W - PAD_X}" y2="${midY}"/>
+        <path class="trend-area" fill="#943f3a" d="${bArea}"/>
+        <path class="trend-area" fill="#607a5c" d="${rArea}"/>
+        <polyline class="trend-line" stroke="#8fa88a" points="${rPoints}"/>
+        <polyline class="trend-line" stroke="#d4908a" points="${bPoints}"/>
+      `;
+
+      document.getElementById('trends-chart-dates').innerHTML =
+        `<span>${escapeHtml(entries[0].date)}</span><span>${escapeHtml(entries[n - 1].date)}</span>`;
+    }
+
+    function renderTrendsHeatmap(logs, range) {
+      const wrap = document.getElementById('trends-heatmap');
+      const byDateKey = new Map(logs.map(l => [l.dateKey, l]));
+      const days = range === 'all' ? Math.min(365, (() => {
+        const oldest = logs.reduce((min, l) => l.dateKey < min ? l.dateKey : min, isoDate(new Date()));
+        return Math.round((new Date() - new Date(oldest)) / 86400000) + 1;
+      })()) : parseInt(range, 10);
+
+      const cells = [];
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(); d.setDate(d.getDate() - i);
+        const dateKey = isoDate(d);
+        const entry = byDateKey.get(dateKey);
+        cells.push({ dateKey, entry });
+      }
+      // Pad the front so the grid always chunks evenly into columns of 7
+      while (cells.length % 7 !== 0) cells.unshift({ dateKey: null, entry: null, pad: true });
+
+      const cols = [];
+      for (let i = 0; i < cells.length; i += 7) cols.push(cells.slice(i, i + 7));
+
+      wrap.innerHTML = cols.map(col => `
+        <div class="heatmap-col">
+          ${col.map(c => {
+            if (c.pad) return `<div class="heatmap-cell is-pad" style="visibility:hidden"></div>`;
+            const bg = c.entry ? (BREAKOUT_COLORS[parseInt(c.entry.breakout)] || '#f2e0de') : null;
+            const cls = c.entry ? 'heatmap-cell' : 'heatmap-cell is-empty';
+            return `<div class="${cls}" ${bg ? `style="background:${bg}"` : ''} data-date-key="${c.dateKey}" onclick="selectHeatmapCell('${c.dateKey}')" title="${escapeHtml(c.dateKey)}"></div>`;
+          }).join('')}
+        </div>`).join('');
+
+      document.getElementById('trends-heatmap-selected').textContent = '';
+    }
+
+    function selectHeatmapCell(dateKey) {
+      const entry = getLogs().find(l => l.dateKey === dateKey);
+      const label = document.getElementById('trends-heatmap-selected');
+      if (!entry) { label.textContent = `${dateKey} — no entry`; return; }
+      label.textContent = `${entry.date} — Breakout: ${BREAKOUT_LABELS[parseInt(entry.breakout)]}`;
+    }
+
+    /** Consolidated "worth noting" digest for the selected range — reuses
+     *  computeTopTriggerPatterns / computeProductImpact / computeAreaFrequency
+     *  rather than inventing new correlation math for this view. */
+    function renderTrendsInsights(entries) {
+      const el = document.getElementById('trends-insights');
+      const cards = [];
+
+      const triggerPatterns = computeTopTriggerPatterns(entries, 1);
+      triggerPatterns.forEach(p => cards.push(`
+        <div class="flex items-start gap-3 p-3 bg-white/70 rounded-2xl border border-blush/10">
+          <span class="text-lg mt-0.5">🔍</span>
+          <div><p class="text-sm font-semibold text-bark">"${escapeHtml(p.word)}" linked to ${p.delta > 0 ? 'higher' : 'lower'} breakout</p>
+          <p class="text-xs text-bark-muted mt-0.5">Avg ${p.withBreakout}/5 on days mentioned vs ${p.withoutBreakout}/5 when not</p></div>
+        </div>`));
+
+      const productImpacts = getProducts()
+        .filter(p => !p.archived)
+        .map(p => ({ product: p, impact: computeProductImpact(p) }))
+        .filter(x => !x.impact.insufficient)
+        .sort((a, b) => Math.abs(b.impact.duringBreakout - b.impact.beforeBreakout) - Math.abs(a.impact.duringBreakout - a.impact.beforeBreakout))
+        .slice(0, 1);
+      productImpacts.forEach(({ product, impact }) => {
+        const delta = impact.duringBreakout - impact.beforeBreakout;
+        cards.push(`
+          <div class="flex items-start gap-3 p-3 bg-white/70 rounded-2xl border border-blush/10">
+            <span class="text-lg mt-0.5">🧴</span>
+            <div><p class="text-sm font-semibold text-bark">${escapeHtml(product.name)} linked to ${delta > 0 ? 'higher' : 'lower'} breakout</p>
+            <p class="text-xs text-bark-muted mt-0.5">Avg ${impact.duringBreakout}/5 while using vs ${impact.beforeBreakout}/5 before</p></div>
+          </div>`);
+      });
+
+      const areaFreq = computeAreaFrequency(entries).filter(a => a.count > 0).slice(0, 1);
+      areaFreq.forEach(a => cards.push(`
+        <div class="flex items-start gap-3 p-3 bg-white/70 rounded-2xl border border-blush/10">
+          <span class="text-lg mt-0.5">📍</span>
+          <div><p class="text-sm font-semibold text-bark">${escapeHtml(a.label)} is your most-logged area</p>
+          <p class="text-xs text-bark-muted mt-0.5">Marked on ${a.count} of ${entries.length} entries (${a.pct}%)</p></div>
+        </div>`));
+
+      el.innerHTML = cards.length ? cards.join('') + `
+        <p class="text-[10px] text-bark-muted text-center italic pt-1">Correlational only — not a diagnosis.</p>` : `
+        <p class="text-xs text-bark-muted text-center py-3">Keep logging to unlock deeper insights.</p>`;
     }
 
     /* ══════════════════════════════════════════════
