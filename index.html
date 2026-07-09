@@ -183,6 +183,46 @@
     }
     .routine-toggle:active { transform: scale(0.95); }
 
+    /* ── PHASE 6: PRODUCT TRACKING ── */
+
+    /* Chip under each routine step, opens the product picker */
+    .product-chip {
+      font-size: 11px; font-weight: 600;
+      padding: 4px 10px; border-radius: 99px;
+      background: rgba(255,255,255,0.6);
+      border: 1px solid rgba(212,144,138,0.18);
+      color: #9e8a80;
+      transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
+      max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .product-chip:active { transform: scale(0.96); }
+    .product-chip.has-product {
+      background: linear-gradient(135deg, #f2e0de, #faf7f4);
+      border-color: rgba(212,144,138,0.35);
+      color: #b5706a;
+    }
+
+    /* "Other Products" multi-select pills */
+    .other-product-pill {
+      font-size: 12px; font-weight: 600;
+      padding: 7px 14px; border-radius: 99px;
+      background: rgba(255,255,255,0.65);
+      border: 1.5px solid rgba(212,144,138,0.18);
+      color: #9e8a80;
+      transition: all 0.15s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .other-product-pill:active { transform: scale(0.95); }
+    .other-product-pill.active {
+      background: linear-gradient(135deg, #dde8db, #eef5ed);
+      border-color: #8fa88a;
+      color: #3f5c3c;
+    }
+    .other-product-pill-add {
+      background: transparent;
+      border: 1.5px dashed rgba(212,144,138,0.4);
+      color: #b5706a;
+    }
+
     /* Notes textarea */
     .skin-textarea {
       background: rgba(255,255,255,0.7);
@@ -283,6 +323,27 @@
       box-shadow: 0 2px 8px rgba(58,46,40,0.1);
     }
     .history-photo:active { transform: scale(0.97); }
+
+    /* ── PHASE 6: BEFORE/AFTER COMPARE ── */
+    .compare-stack {
+      position: relative;
+      width: 100%; aspect-ratio: 1 / 1;
+      border-radius: 16px; overflow: hidden;
+      background: #f2e0de;
+      box-shadow: 0 2px 12px rgba(58,46,40,0.12);
+    }
+    .compare-stack img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover; display: block;
+    }
+    .compare-divider {
+      position: absolute; top: 0; bottom: 0;
+      width: 3px; background: #fff;
+      box-shadow: 0 0 0 1px rgba(58,46,40,0.15), 0 2px 8px rgba(0,0,0,0.25);
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
 
     /* Photo lightbox overlay */
     .photo-lightbox {
@@ -699,6 +760,11 @@
               <button class="routine-toggle w-14 rounded-xl text-[11px] font-bold" data-step="cleanser" data-period="pm" onclick="toggleRoutine(this)">PM</button>
             </div>
           </div>
+          <div class="flex justify-end -mt-1.5">
+            <button type="button" class="product-chip" data-category="cleanser" onclick="openProductPicker('cleanser')">
+              <span id="product-chip-label-cleanser">No product tagged</span>
+            </button>
+          </div>
           <!-- Treatment -->
           <div class="flex items-center gap-3">
             <div class="w-8 h-8 rounded-xl bg-sage-light flex items-center justify-center flex-shrink-0">
@@ -709,6 +775,11 @@
               <button class="routine-toggle w-14 rounded-xl text-[11px] font-bold" data-step="treatment" data-period="am" onclick="toggleRoutine(this)">AM</button>
               <button class="routine-toggle w-14 rounded-xl text-[11px] font-bold" data-step="treatment" data-period="pm" onclick="toggleRoutine(this)">PM</button>
             </div>
+          </div>
+          <div class="flex justify-end -mt-1.5">
+            <button type="button" class="product-chip" data-category="treatment" onclick="openProductPicker('treatment')">
+              <span id="product-chip-label-treatment">No product tagged</span>
+            </button>
           </div>
           <!-- Moisturizer -->
           <div class="flex items-center gap-3">
@@ -721,6 +792,11 @@
               <button class="routine-toggle w-14 rounded-xl text-[11px] font-bold" data-step="moisturizer" data-period="pm" onclick="toggleRoutine(this)">PM</button>
             </div>
           </div>
+          <div class="flex justify-end -mt-1.5">
+            <button type="button" class="product-chip" data-category="moisturizer" onclick="openProductPicker('moisturizer')">
+              <span id="product-chip-label-moisturizer">No product tagged</span>
+            </button>
+          </div>
           <!-- SPF -->
           <div class="flex items-center gap-3">
             <div class="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
@@ -731,6 +807,23 @@
               <button class="routine-toggle w-14 rounded-xl text-[11px] font-bold" data-step="spf" data-period="am" onclick="toggleRoutine(this)">AM</button>
               <button class="routine-toggle w-14 rounded-xl text-[11px] font-bold" data-step="spf" data-period="pm" onclick="toggleRoutine(this)" style="opacity:0.38;pointer-events:none" title="SPF is AM only">—</button>
             </div>
+          </div>
+          <div class="flex justify-end -mt-1.5">
+            <button type="button" class="product-chip" data-category="spf" onclick="openProductPicker('spf')">
+              <span id="product-chip-label-spf">No product tagged</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ── OTHER PRODUCTS (Phase 6) ── -->
+        <div class="mt-4 pt-4 border-t border-blush-light/60">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="w-6 h-6 rounded-lg bg-sage-light flex items-center justify-center text-xs flex-shrink-0">🧪</span>
+            <p class="text-xs font-semibold text-bark-muted uppercase tracking-widest">Other Products</p>
+            <span class="text-[10px] text-bark-muted font-medium ml-auto">Optional</span>
+          </div>
+          <div id="other-products-wrap" class="flex flex-wrap gap-2">
+            <!-- Populated by renderOtherProductPills() -->
           </div>
         </div>
 
@@ -881,6 +974,18 @@
             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
         </svg>
         <span>Export Report for Dermatologist</span>
+        <svg class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+        </svg>
+      </button>
+
+      <!-- ── COMPARE PHOTOS CTA (hidden until ≥2 photo entries) ── -->
+      <button id="compare-cta" onclick="openCompareModal()"
+        class="hidden w-full text-blush-dark font-bold text-sm py-4 rounded-2xl active:scale-95 transition-transform flex items-center justify-center gap-3 border-2 border-blush-mid bg-white/60">
+        <svg class="w-5 h-5 opacity-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v18M3 8h4m-4 8h4M21 8h-4m4 8h-4M15 3v18"/>
+        </svg>
+        <span>Compare Before &amp; After</span>
         <svg class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
         </svg>
@@ -1106,6 +1211,108 @@
     </div>
   </div>
 
+  <!-- ════════════════════════════
+       MY PRODUCTS MODAL (Phase 6)
+  ═════════════════════════════ -->
+  <div id="products-modal" class="modal-overlay hidden" onclick="handleProductsModalBackdrop(event)">
+    <div class="modal-sheet">
+
+      <!-- Modal drag handle -->
+      <div class="flex justify-center pt-3 pb-1">
+        <div class="w-10 h-1 rounded-full bg-gray-200"></div>
+      </div>
+
+      <!-- Modal header -->
+      <div class="px-6 py-4 border-b border-gray-100 flex items-start justify-between">
+        <div>
+          <p class="text-[10px] font-bold uppercase tracking-widest text-bark-muted">SkinLog · Tracking</p>
+          <h2 class="font-serif text-2xl text-bark mt-0.5">My Products</h2>
+          <p class="text-xs text-bark-muted mt-1">Self-tracked — SkinLog never recommends products.</p>
+        </div>
+        <button onclick="closeProductsModal()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 active:scale-90 transition-transform mt-1 flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Body injected by openProductsModal() -->
+      <div class="px-6 py-5 space-y-6" id="products-modal-body"></div>
+
+      <!-- Modal footer actions -->
+      <div class="px-6 pb-10 pt-2 flex gap-3">
+        <button onclick="closeProductsModal()"
+          class="flex-1 py-3.5 rounded-2xl border-2 border-blush-mid text-blush-dark font-bold text-sm active:scale-95 transition-transform">
+          Close
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ════════════════════════════
+       BEFORE/AFTER COMPARE MODAL (Phase 6)
+  ═════════════════════════════ -->
+  <div id="compare-modal" class="modal-overlay hidden" onclick="handleCompareModalBackdrop(event)">
+    <div class="modal-sheet">
+
+      <!-- Modal drag handle -->
+      <div class="flex justify-center pt-3 pb-1">
+        <div class="w-10 h-1 rounded-full bg-gray-200"></div>
+      </div>
+
+      <!-- Modal header -->
+      <div class="px-6 py-4 border-b border-gray-100 flex items-start justify-between">
+        <div>
+          <p class="text-[10px] font-bold uppercase tracking-widest text-bark-muted">SkinLog · Progress</p>
+          <h2 class="font-serif text-2xl text-bark mt-0.5">Before &amp; After</h2>
+        </div>
+        <button onclick="closeCompareModal()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 active:scale-90 transition-transform mt-1 flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="px-6 py-5">
+        <!-- Before date -->
+        <button type="button" onclick="openComparePicker('before')" class="w-full flex items-center justify-between chip px-3 py-2 rounded-xl mb-2">
+          <span class="text-[10px] font-bold uppercase tracking-widest text-bark-muted">Before</span>
+          <span id="compare-before-date" class="text-xs font-semibold text-blush-dark"></span>
+        </button>
+
+        <!-- Image compare stack -->
+        <div class="compare-stack">
+          <img id="compare-before-img" src="" alt="Before photo" />
+          <img id="compare-after-img" src="" alt="After photo" />
+          <div class="compare-divider" style="left:50%"></div>
+        </div>
+        <input type="range" min="0" max="100" value="50" oninput="updateCompareReveal(this.value)" style="--thumb-color:#d4908a; --val:50%" class="w-full mt-3" />
+
+        <!-- Score readouts -->
+        <div class="flex items-center justify-between mt-3 text-[11px]">
+          <div id="compare-before-scores" class="text-bark-muted"></div>
+          <div id="compare-after-scores" class="text-bark-muted text-right"></div>
+        </div>
+
+        <!-- After date -->
+        <button type="button" onclick="openComparePicker('after')" class="w-full flex items-center justify-between chip px-3 py-2 rounded-xl mt-3">
+          <span class="text-[10px] font-bold uppercase tracking-widest text-bark-muted">After</span>
+          <span id="compare-after-date" class="text-xs font-semibold text-blush-dark"></span>
+        </button>
+      </div>
+
+      <!-- Modal footer actions -->
+      <div class="px-6 pb-10 pt-2 flex gap-3">
+        <button onclick="closeCompareModal()"
+          class="flex-1 py-3.5 rounded-2xl border-2 border-blush-mid text-blush-dark font-bold text-sm active:scale-95 transition-transform">
+          Close
+        </button>
+      </div>
+
+    </div>
+  </div>
+
   <style>
     /* Nav states */
     .active-nav {
@@ -1247,6 +1454,7 @@
           l.dateKey = isNaN(parsed) ? isoDate(new Date()) : isoDate(parsed);
           migrated = true;
         }
+        if (!l.products) { l.products = {}; migrated = true; }
       });
       if (migrated) saveLogs(arr);
       return arr;
@@ -1266,6 +1474,72 @@
     function avg(arr) {
       if (!arr.length) return 0;
       return (arr.reduce((a,b) => a+b, 0) / arr.length).toFixed(1);
+    }
+
+    /* ══════════════════════════════════════════════
+       PRODUCT TRACKING — self-reported products per routine category
+       (+ a free-form "other" category for serums/exfoliants/masks/etc.
+       with no routine-step home). Never recommends products — only lets
+       users log what they're using and see a correlation with their own
+       severity trend.
+    ══════════════════════════════════════════════ */
+    const PRODUCT_CATEGORIES = ['cleanser', 'treatment', 'moisturizer', 'spf', 'other'];
+    const PRODUCT_CATEGORY_LABELS = { cleanser: 'Cleanser', treatment: 'Treatment', moisturizer: 'Moisturizer', spf: 'SPF', other: 'Other' };
+
+    function getProducts() {
+      try { return JSON.parse(localStorage.getItem('skinlog-products') || '[]'); }
+      catch (e) { return []; }
+    }
+    function saveProducts(arr) {
+      try {
+        localStorage.setItem('skinlog-products', JSON.stringify(arr));
+        return true;
+      } catch (e) {
+        showToast('Could not save — device storage is full.', 'error');
+        return false;
+      }
+    }
+    function getCurrentProducts() {
+      let map;
+      try { map = JSON.parse(localStorage.getItem('skinlog-current-products') || '{}'); }
+      catch (e) { map = {}; }
+      return { cleanser: null, treatment: null, moisturizer: null, spf: null, ...map };
+    }
+    function saveCurrentProducts(map) {
+      try { localStorage.setItem('skinlog-current-products', JSON.stringify(map)); } catch (e) {}
+    }
+
+    /** Whether an entry counts as "using" a product — a single id match for
+     *  the 4 fixed categories, or array membership for the free-form 'other'
+     *  category (which can have several products active on the same day). */
+    function productUsedInEntry(entry, product) {
+      if (product.category === 'other') return (entry.products?.other || []).includes(product.id);
+      return entry.products?.[product.category] === product.id;
+    }
+
+    /** Correlational (not causal) before/after comparison for a product:
+     *  avg severity on days it was used vs. avg severity before its start
+     *  date. Requires at least 3 entries on each side to avoid drawing a
+     *  conclusion from a couple of noisy data points. */
+    function computeProductImpact(product) {
+      const logs = getLogs();
+      const during = logs.filter(l => productUsedInEntry(l, product));
+      const before = logs.filter(l => l.dateKey < product.startDate);
+      if (during.length < 3 || before.length < 3) return { insufficient: true };
+      return {
+        insufficient: false,
+        duringBreakout: avg(during.map(l => parseInt(l.breakout))),
+        duringRedness:  avg(during.map(l => parseInt(l.redness))),
+        beforeBreakout: avg(before.map(l => parseInt(l.breakout))),
+        beforeRedness:  avg(before.map(l => parseInt(l.redness))),
+      };
+    }
+
+    /** All entries with a progress photo, oldest → newest — the single
+     *  source of truth for both the History compare CTA and the compare
+     *  modal's date picker. */
+    function getPhotoEntries() {
+      return getLogs().filter(l => l.photo).sort((a, b) => a.dateKey.localeCompare(b.dateKey));
     }
     function trendArrow(vals) {
       if (vals.length < 2) return { arrow:'—', color:'#9e8a80', label:'Insufficient data' };
@@ -1371,6 +1645,247 @@
     }
 
     /* ══════════════════════════════════════════════
+       PRODUCT PICKERS — Log screen chips (4 fixed categories) +
+       "Other Products" multi-select pills, all reusing the app's
+       centered-popup visual pattern (see showConfirmDialog).
+    ══════════════════════════════════════════════ */
+    function renderProductChip(category) {
+      const label = document.getElementById(`product-chip-label-${category}`);
+      const chip = document.querySelector(`.product-chip[data-category="${category}"]`);
+      if (!label || !chip) return;
+      const id = _formProducts[category];
+      const product = id ? getProducts().find(p => p.id === id) : null;
+      label.textContent = product ? product.name : 'No product tagged';
+      chip.classList.toggle('has-product', !!product);
+    }
+    function renderAllProductChips() {
+      ['cleanser', 'treatment', 'moisturizer', 'spf'].forEach(renderProductChip);
+    }
+
+    function toggleOtherProduct(productId) {
+      const idx = _formProducts.other.indexOf(productId);
+      if (idx >= 0) _formProducts.other.splice(idx, 1); else _formProducts.other.push(productId);
+      renderOtherProductPills();
+    }
+    function renderOtherProductPills() {
+      const wrap = document.getElementById('other-products-wrap');
+      if (!wrap) return;
+      const products = getProducts().filter(p => p.category === 'other' && !p.archived);
+      wrap.innerHTML = products.map(p => `
+        <button type="button" class="other-product-pill ${_formProducts.other.includes(p.id) ? 'active' : ''}" onclick="toggleOtherProduct('${p.id}')">${escapeHtml(p.name)}</button>
+      `).join('') + `
+        <button type="button" class="other-product-pill other-product-pill-add" onclick="promptAddProduct('other', function(p){ _formProducts.other.push(p.id); renderOtherProductPills(); })">+ Add</button>
+      `;
+    }
+
+    function closeProductPicker() {
+      document.getElementById('sl-product-picker-overlay')?.remove();
+      document.body.style.overflow = '';
+    }
+    function openProductPicker(category) {
+      closeProductPicker();
+      const products = getProducts().filter(p => p.category === category && !p.archived);
+      const overlay = document.createElement('div');
+      overlay.id = 'sl-product-picker-overlay';
+      overlay.className = 'modal-overlay';
+      overlay.style.zIndex = '250';
+      overlay.style.alignItems = 'center';
+      const rowStyle = 'width:100%;text-align:left;padding:12px 14px;border-radius:12px;border:1.5px solid #f0e8e6;background:#fff;font-family:\'DM Sans\',sans-serif;font-size:13px;font-weight:600;color:#3a2e28;margin-bottom:8px;display:block;';
+      const rows = products.map(p => `<button type="button" data-product-id="${p.id}" style="${rowStyle}">${escapeHtml(p.name)}</button>`).join('');
+      overlay.innerHTML = `
+        <div style="background:#fff;border-radius:24px;max-width:340px;width:calc(100% - 40px);margin:0 auto;padding:24px;max-height:70vh;overflow-y:auto;box-shadow:0 12px 40px rgba(58,46,40,0.2);animation:lbSlideUp 0.25s cubic-bezier(.34,1.1,.64,1) both;">
+          <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:#3a2e28;margin:0 0 14px;">${escapeHtml(PRODUCT_CATEGORY_LABELS[category])} product</h3>
+          <button type="button" data-product-id="" style="${rowStyle}color:#9e8a80;background:#faf7f4;">None</button>
+          ${rows}
+          <button type="button" id="sl-product-picker-add" style="width:100%;text-align:left;padding:12px 14px;border-radius:12px;border:1.5px dashed rgba(212,144,138,0.4);background:#fff;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;color:#b5706a;">+ Add product</button>
+        </div>`;
+      document.body.appendChild(overlay);
+      document.body.style.overflow = 'hidden';
+      overlay.addEventListener('click', e => { if (e.target === overlay) closeProductPicker(); });
+      overlay.querySelectorAll('[data-product-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.productId || null;
+          _formProducts[category] = id;
+          const map = getCurrentProducts();
+          map[category] = id;
+          saveCurrentProducts(map);
+          renderProductChip(category);
+          closeProductPicker();
+        });
+      });
+      document.getElementById('sl-product-picker-add').addEventListener('click', () => {
+        closeProductPicker();
+        promptAddProduct(category, (product) => {
+          _formProducts[category] = product.id;
+          const map = getCurrentProducts();
+          map[category] = product.id;
+          saveCurrentProducts(map);
+          renderProductChip(category);
+        });
+      });
+    }
+
+    function closeAddProductPopup() {
+      document.getElementById('sl-add-product-overlay')?.remove();
+      document.body.style.overflow = '';
+    }
+    function promptAddProduct(category, onCreated) {
+      closeAddProductPopup();
+      const overlay = document.createElement('div');
+      overlay.id = 'sl-add-product-overlay';
+      overlay.className = 'modal-overlay';
+      overlay.style.zIndex = '260';
+      overlay.style.alignItems = 'center';
+      overlay.innerHTML = `
+        <div style="background:#fff;border-radius:24px;max-width:340px;width:calc(100% - 40px);margin:0 auto;padding:24px;box-shadow:0 12px 40px rgba(58,46,40,0.2);animation:lbSlideUp 0.25s cubic-bezier(.34,1.1,.64,1) both;">
+          <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:#3a2e28;margin:0 0 4px;">Add ${escapeHtml(PRODUCT_CATEGORY_LABELS[category])} product</h3>
+          <p style="font-size:12px;color:#9e8a80;margin:0 0 14px;">Track it here to see how your skin trends since you started.</p>
+          <input id="sl-add-product-name" type="text" maxlength="60" placeholder="Product name…"
+            style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1.5px solid #f0e8e6;background:#faf7f4;font-family:'DM Sans',sans-serif;font-size:14px;color:#3a2e28;outline:none;margin-bottom:10px;" />
+          <label style="display:block;font-size:11px;font-weight:700;color:#9e8a80;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Started using on</label>
+          <input id="sl-add-product-date" type="date" value="${isoDate(new Date())}"
+            style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1.5px solid #f0e8e6;background:#faf7f4;font-family:'DM Sans',sans-serif;font-size:14px;color:#3a2e28;outline:none;margin-bottom:16px;" />
+          <p id="sl-add-product-error" style="display:none;color:#943f3a;font-size:12px;font-weight:600;margin:0 0 10px;padding:8px 12px;background:#fdf2f2;border-radius:10px;">Please enter a product name.</p>
+          <div style="display:flex;gap:10px;">
+            <button id="sl-add-product-cancel" style="flex:1;padding:12px;border-radius:14px;border:1.5px solid #f0e8e6;background:#fff;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;color:#7a6055;">Cancel</button>
+            <button id="sl-add-product-save" style="flex:1;padding:12px;border-radius:14px;border:none;background:linear-gradient(110deg,#b5706a,#d4908a);font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;color:#fff;">Add</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      document.body.style.overflow = 'hidden';
+      overlay.addEventListener('click', e => { if (e.target === overlay) closeAddProductPopup(); });
+      document.getElementById('sl-add-product-cancel').onclick = closeAddProductPopup;
+      const nameField = document.getElementById('sl-add-product-name');
+      setTimeout(() => nameField.focus(), 80);
+      document.getElementById('sl-add-product-save').onclick = () => {
+        const name = nameField.value.trim();
+        if (!name) { document.getElementById('sl-add-product-error').style.display = 'block'; nameField.focus(); return; }
+        const startDate = document.getElementById('sl-add-product-date').value || isoDate(new Date());
+        const product = { id: uid(), name, category, startDate, archived: false };
+        const products = getProducts();
+        products.push(product);
+        if (!saveProducts(products)) return;
+        closeAddProductPopup();
+        onCreated(product);
+      };
+    }
+
+    /* ══════════════════════════════════════════════
+       MY PRODUCTS MODAL — list, before/after impact, archive/delete
+    ══════════════════════════════════════════════ */
+    function renderProductRow(product, current) {
+      const isCurrent = current[product.category] === product.id;
+      const impact = computeProductImpact(product);
+      const isUsed = getLogs().some(l => productUsedInEntry(l, product));
+      let impactHtml;
+      if (impact.insufficient) {
+        impactHtml = `<p class="text-[11px] text-bark-muted mt-1">Not enough data yet — need at least 3 entries before and 3 while using.</p>`;
+      } else {
+        impactHtml = `
+          <p class="text-[11px] text-bark-muted mt-1">
+            Avg breakout while using: <strong style="color:#3a2e28">${impact.duringBreakout}</strong> (was ${impact.beforeBreakout} before) ·
+            Avg redness: <strong style="color:#3a2e28">${impact.duringRedness}</strong> (was ${impact.beforeRedness} before)
+          </p>
+          <p class="text-[10px] text-bark-muted mt-0.5" style="font-style:italic;">Correlation only — not a cause-and-effect conclusion.</p>`;
+      }
+
+      const actionBtn = product.archived
+        ? `<button onclick="unarchiveProduct('${product.id}')" class="text-[11px] font-bold text-sage-dark underline underline-offset-2 flex-shrink-0">Unarchive</button>`
+        : `<button onclick="deleteOrArchiveProduct('${product.id}')" class="text-[11px] font-bold text-blush-dark underline underline-offset-2 flex-shrink-0">${isUsed ? 'Archive' : 'Delete'}</button>`;
+
+      return `
+        <div class="card rounded-2xl p-3.5 ${product.archived ? 'opacity-60' : ''}">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <p class="text-sm font-semibold text-bark">${escapeHtml(product.name)}</p>
+              <p class="text-[10px] text-bark-muted mt-0.5">Since ${escapeHtml(product.startDate)}${product.archived ? ' · Archived' : ''}</p>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              ${isCurrent && !product.archived ? `<span class="text-[10px] font-bold px-2 py-1 rounded-full bg-sage-light text-sage-dark">In Use</span>` : ''}
+              ${actionBtn}
+            </div>
+          </div>
+          ${impactHtml}
+        </div>`;
+    }
+
+    function openProductsModal() {
+      const body = document.getElementById('products-modal-body');
+      const products = getProducts();
+      const current = getCurrentProducts();
+
+      const sections = PRODUCT_CATEGORIES.map(category => {
+        const inCategory = products.filter(p => p.category === category);
+        if (inCategory.length === 0) return '';
+        return `
+          <section>
+            <p class="report-section-title" style="font-size:14px;">${escapeHtml(PRODUCT_CATEGORY_LABELS[category])}</p>
+            <div class="space-y-2">${inCategory.map(p => renderProductRow(p, current)).join('')}</div>
+          </section>`;
+      }).join('');
+
+      body.innerHTML = sections.trim() ? sections : `
+        <div class="flex flex-col items-center justify-center py-8 gap-3 text-center">
+          <span class="text-2xl">🧴</span>
+          <p class="text-sm font-semibold text-bark">No products tracked yet</p>
+          <p class="text-xs text-bark-muted" style="max-width:240px;">Tag a product under any routine step (or Other Products) on the Log screen to start tracking it here.</p>
+        </div>`;
+
+      document.getElementById('products-modal').classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeProductsModal() {
+      document.getElementById('products-modal').classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+    function handleProductsModalBackdrop(e) {
+      if (e.target === document.getElementById('products-modal')) closeProductsModal();
+    }
+
+    function deleteOrArchiveProduct(id) {
+      const products = getProducts();
+      const product = products.find(p => p.id === id);
+      if (!product) return;
+      const isUsed = getLogs().some(l => productUsedInEntry(l, product));
+
+      if (!isUsed) {
+        showConfirmDialog({
+          title: 'Delete this product?',
+          message: `<strong>${escapeHtml(product.name)}</strong> has no entries tagged with it, so this fully removes it. This can’t be undone.`,
+          confirmLabel: 'Delete',
+          danger: true,
+          onConfirm: () => {
+            if (!saveProducts(products.filter(p => p.id !== id))) return;
+            openProductsModal();
+            showToast('Product deleted', 'info');
+          },
+        });
+        return;
+      }
+
+      product.archived = true;
+      if (!saveProducts(products)) return;
+      const current = getCurrentProducts();
+      if (current[product.category] === id) {
+        current[product.category] = null;
+        saveCurrentProducts(current);
+      }
+      openProductsModal();
+      showToast('Product archived', 'info');
+    }
+
+    function unarchiveProduct(id) {
+      const products = getProducts();
+      const product = products.find(p => p.id === id);
+      if (!product) return;
+      product.archived = false;
+      if (!saveProducts(products)) return;
+      openProductsModal();
+      showToast('Product unarchived', 'success');
+    }
+
+    /* ══════════════════════════════════════════════
        PHASE 5 — CANVAS PHOTO COMPRESSION
        Pipeline: File → FileReader → <img> → <canvas>
        → toDataURL('image/jpeg', 0.6) capped at 400px wide
@@ -1383,6 +1898,8 @@
     let _photoExplicitlyCleared = false; // user tapped the × on an existing photo
     let _editingEntryId        = null;  // id of the entry being edited, or null for a fresh entry
     let _editingOriginalPhoto  = null;  // photo carried over from the entry being edited
+    let _formProducts = { cleanser: null, treatment: null, moisturizer: null, spf: null, other: [] };
+    let _compareIdx = { before: 0, after: 0 }; // indices into getPhotoEntries(), oldest→newest
 
     /**
      * compressPhoto(file, onDone)
@@ -1513,6 +2030,10 @@
       const label = document.getElementById('log-date-label');
       if (label) label.textContent = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       updateLogHeader(false);
+
+      _formProducts = { ...getCurrentProducts(), other: [] };
+      renderAllProductChips();
+      renderOtherProductPills();
     }
 
     /** Populates the log form's inputs from an existing entry, for editing. */
@@ -1550,6 +2071,10 @@
       } else {
         img.src = ''; zone.classList.remove('hidden'); wrap.classList.add('hidden');
       }
+
+      _formProducts = { cleanser: null, treatment: null, moisturizer: null, spf: null, ...(entry.products || {}), other: [...(entry.products?.other || [])] };
+      renderAllProductChips();
+      renderOtherProductPills();
     }
 
     /** Shows/hides the "you're editing an existing entry" banner on the Log screen. */
@@ -1625,6 +2150,7 @@
           triggers: document.getElementById('note-triggers').value,
           sleep:    document.querySelector('.sleep-btn[style*="background"]')?.dataset.sleep || 'not set',
           photo:    photoDataUrl || null,   // compressed JPEG data URL or null
+          products: { ..._formProducts, other: [..._formProducts.other] },
         };
 
         // Upsert: editing replaces by id; a fresh save replaces any existing
@@ -1672,6 +2198,8 @@
       // Clear previous render (keep spine div)
       [...timeline.children].forEach(c => { if (!c.classList.contains('timeline-spine')) c.remove(); });
       statsEl.innerHTML = '';
+
+      document.getElementById('compare-cta')?.classList.toggle('hidden', getPhotoEntries().length < 2);
 
       if (logs.length === 0) {
         empty.classList.remove('hidden');
@@ -1899,6 +2427,32 @@
         return `<span class="severity-pill" style="background:${bg};color:${col}">${v} – ${BREAKOUT_LABELS[v]||v}</span>`;
       }
 
+      /* — products referenced by any entry in range — */
+      const productsInRange = getProducts().filter(p => logs.some(l => productUsedInEntry(l, p)));
+      const productsTableRows = productsInRange.map(p => {
+        const usedLogs = logs.filter(l => productUsedInEntry(l, p));
+        return `
+          <tr>
+            <td style="font-weight:600">${escapeHtml(p.name)}</td>
+            <td style="text-transform:capitalize">${escapeHtml(PRODUCT_CATEGORY_LABELS[p.category])}</td>
+            <td style="white-space:nowrap">${escapeHtml(p.startDate)}</td>
+            <td>${usedLogs.length}</td>
+            <td>${sLabel(Math.round(avg(usedLogs.map(l => parseInt(l.breakout)))))}</td>
+            <td>${sLabel(Math.round(avg(usedLogs.map(l => parseInt(l.redness)))))}</td>
+          </tr>`;
+      }).join('');
+      const productsSectionHtml = productsInRange.length === 0 ? `
+        <div style="background:#faf7f4;border-radius:12px;padding:18px;text-align:center;font-size:12px;color:#9e8a80;">
+          No products were tagged during this observation period.
+        </div>` : `
+        <table class="report-table" style="border:1px solid #f2e0de;border-radius:12px;overflow:hidden;">
+          <thead>
+            <tr><th>Product</th><th>Category</th><th>Since</th><th># Entries</th><th>Avg Breakout</th><th>Avg Redness</th></tr>
+          </thead>
+          <tbody>${productsTableRows}</tbody>
+        </table>
+        <p style="font-size:10px;color:#9e8a80;margin:8px 0 0;font-style:italic;">Correlational only — reflects entries logged while a product was tagged, not a clinical conclusion about efficacy.</p>`;
+
       meta.textContent = `Observation period: ${minDate} – ${maxDate}  ·  ${logs.length} entries  ·  Generated ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}`;
 
       /* — build report sections — */
@@ -1956,9 +2510,15 @@
           <div style="background:#fef2f2;border-radius:12px;padding:14px;font-size:12px;color:#3a2e28;line-height:1.7;white-space:pre-wrap;">${allTriggers || 'No triggers recorded.'}</div>
         </section>
 
-        <!-- SECTION 4: Chronological Log -->
+        <!-- SECTION 5: Products in Use -->
         <section>
-          <p class="report-section-title">5. Chronological Entry Log</p>
+          <p class="report-section-title">5. Products in Use</p>
+          ${productsSectionHtml}
+        </section>
+
+        <!-- SECTION 6: Chronological Log -->
+        <section>
+          <p class="report-section-title">6. Chronological Entry Log</p>
           <div style="overflow-x:auto;border-radius:12px;border:1px solid #f2e0de;">
             <table class="report-table" style="min-width:480px">
               <thead>
@@ -1997,12 +2557,12 @@
           </p>
         </section>
 
-        <!-- SECTION 6: Visual Progress Gallery -->
+        <!-- SECTION 7: Visual Progress Gallery -->
         ${(function(){
           const photoLogs = [...logs].reverse().filter(l => l.photo);
           if (photoLogs.length === 0) return `
             <section>
-              <p class="report-section-title">6. Visual Progress Gallery</p>
+              <p class="report-section-title">7. Visual Progress Gallery</p>
               <div style="background:#faf7f4;border-radius:12px;padding:18px;text-align:center;font-size:12px;color:#9e8a80;">
                 No progress photos were recorded during this observation period.
               </div>
@@ -2038,7 +2598,7 @@
 
           return `
             <section style="page-break-before:auto;">
-              <p class="report-section-title">6. Visual Progress Gallery</p>
+              <p class="report-section-title">7. Visual Progress Gallery</p>
               <p style="font-size:11px;color:#9e8a80;margin:0 0 12px;">
                 ${photoLogs.length} progress photo${photoLogs.length > 1 ? 's' : ''} recorded
                 (earliest → most recent). Photos compressed and stored locally via SkinLog.
@@ -2351,6 +2911,12 @@
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f0e8e6;">
+          <button onclick="openProductsModal(); document.getElementById('account-popup')?.remove();" style="width:100%;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#7a6055;">
+            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/></svg>
+            My Products
+          </button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f0e8e6;">
           <button onclick="exportBackup()" style="width:100%;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#7a6055;">
             <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M7 10l5 5 5-5M12 15V3"/></svg>
             Export Backup
@@ -2385,6 +2951,8 @@
         exportedAt: new Date().toISOString(),
         username: userName,
         entries: getLogs(),
+        products: getProducts(),
+        currentProducts: getCurrentProducts(),
       };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -2438,9 +3006,15 @@
               triggers: l.triggers || '',
               sleep:    l.sleep || 'not set',
               photo:    l.photo || null,
+              products: l.products || {},
             }));
             if (!saveLogs(cleaned)) return;
             if (data.username) setUserName(data.username);
+            // Only touch products if the backup actually has them — an
+            // old-format backup predating this feature shouldn't wipe
+            // whatever products are already tracked.
+            if (Array.isArray(data.products)) saveProducts(data.products);
+            if (data.currentProducts) saveCurrentProducts(data.currentProducts);
             renderHistory();
             hydrateDashboard();
             showToast('Backup restored', 'success');
@@ -2490,11 +3064,109 @@
       document.getElementById('lightbox-photo-img').src = ''; // free memory
       document.body.style.overflow = '';
     }
-    // Also close lightbox / export modal / confirm dialog on Escape key
+
+    /* ══════════════════════════════════════════════
+       PHASE 6 — BEFORE/AFTER PHOTO COMPARE
+    ══════════════════════════════════════════════ */
+    function openCompareModal() {
+      const entries = getPhotoEntries();
+      if (entries.length < 2) return;
+      _compareIdx = { before: 0, after: entries.length - 1 }; // earliest vs. latest by default
+      document.getElementById('compare-modal').classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+      renderCompareModal();
+    }
+    function closeCompareModal() {
+      document.getElementById('compare-modal')?.classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+    function handleCompareModalBackdrop(e) {
+      if (e.target === document.getElementById('compare-modal')) closeCompareModal();
+    }
+
+    function renderCompareModal() {
+      const entries = getPhotoEntries();
+      const beforeEntry = entries[_compareIdx.before];
+      const afterEntry = entries[_compareIdx.after];
+      if (!beforeEntry || !afterEntry) return;
+
+      document.getElementById('compare-before-img').src = beforeEntry.photo;
+      document.getElementById('compare-after-img').src = afterEntry.photo;
+      document.getElementById('compare-before-date').textContent = beforeEntry.date;
+      document.getElementById('compare-after-date').textContent = afterEntry.date;
+
+      const scoreLine = (entry) => `🔴 ${BREAKOUT_LABELS[parseInt(entry.breakout)]} · 🌡️ ${REDNESS_LABELS[parseInt(entry.redness)]}`;
+      document.getElementById('compare-before-scores').textContent = scoreLine(beforeEntry);
+      document.getElementById('compare-after-scores').textContent = scoreLine(afterEntry);
+
+      const slider = document.querySelector('#compare-modal input[type=range]');
+      if (slider) slider.value = 50;
+      updateCompareReveal(50);
+    }
+
+    function updateCompareReveal(val) {
+      const afterImg = document.getElementById('compare-after-img');
+      const divider = document.querySelector('#compare-modal .compare-divider');
+      const slider = document.querySelector('#compare-modal input[type=range]');
+      if (afterImg) afterImg.style.clipPath = `inset(0 ${100 - val}% 0 0)`;
+      if (divider) divider.style.left = `${val}%`;
+      if (slider) slider.style.setProperty('--val', val + '%');
+    }
+
+    /** Tap-to-pick popup for either date in the compare modal — same
+     *  centered-popup pattern as openProductPicker, with a thumbnail per row
+     *  since recognizing a photo by date alone is harder than by product name. */
+    function closeComparePicker() {
+      document.getElementById('sl-compare-picker-overlay')?.remove();
+    }
+    function openComparePicker(side) {
+      closeComparePicker();
+      const entries = getPhotoEntries();
+      const overlay = document.createElement('div');
+      overlay.id = 'sl-compare-picker-overlay';
+      overlay.className = 'modal-overlay';
+      overlay.style.zIndex = '260';
+      overlay.style.alignItems = 'center';
+      const rows = entries.map(entry => {
+        const scoreLabel = `🔴 ${BREAKOUT_LABELS[parseInt(entry.breakout)]} · 🌡️ ${REDNESS_LABELS[parseInt(entry.redness)]}`;
+        return `
+          <button type="button" data-entry-id="${entry.id}" style="width:100%;display:flex;align-items:center;gap:10px;text-align:left;padding:8px;border-radius:12px;border:1.5px solid #f0e8e6;background:#fff;margin-bottom:8px;">
+            <img src="${entry.photo}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0;" />
+            <span style="flex:1;overflow:hidden;">
+              <span style="display:block;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;color:#3a2e28;">${escapeHtml(entry.date)}</span>
+              <span style="display:block;font-family:'DM Sans',sans-serif;font-size:11px;color:#9e8a80;">${scoreLabel}</span>
+            </span>
+          </button>`;
+      }).join('');
+      overlay.innerHTML = `
+        <div style="background:#fff;border-radius:24px;max-width:340px;width:calc(100% - 40px);margin:0 auto;padding:24px;max-height:70vh;overflow-y:auto;box-shadow:0 12px 40px rgba(58,46,40,0.2);animation:lbSlideUp 0.25s cubic-bezier(.34,1.1,.64,1) both;">
+          <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:#3a2e28;margin:0 0 14px;">Pick a ${side === 'before' ? 'before' : 'after'} photo</h3>
+          ${rows}
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', e => { if (e.target === overlay) closeComparePicker(); });
+      overlay.querySelectorAll('[data-entry-id]').forEach(btn => {
+        btn.addEventListener('click', () => selectCompareEntry(side, btn.dataset.entryId));
+      });
+    }
+    function selectCompareEntry(side, entryId) {
+      const idx = getPhotoEntries().findIndex(e => e.id === entryId);
+      if (idx < 0) return;
+      _compareIdx[side] = idx;
+      closeComparePicker();
+      renderCompareModal();
+    }
+
+    // Also close lightbox / export modal / products modal / popups / confirm dialog on Escape key
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
         closePhotoLightbox();
         closeExportModal();
+        closeProductsModal();
+        closeProductPicker();
+        closeAddProductPopup();
+        closeCompareModal();
+        closeComparePicker();
         const confirmOverlay = document.getElementById('sl-confirm-overlay');
         if (confirmOverlay) { confirmOverlay.remove(); document.body.style.overflow = ''; }
       }
