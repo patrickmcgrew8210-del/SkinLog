@@ -1,0 +1,2512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>SkinLog</title>
+  <meta name="description" content="SkinLog — a personal dermatology journal. Track breakouts, redness, routine adherence, and triggers, then export a clinician-ready report." />
+
+  <!-- PWA: installable, standalone app-like chrome -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#d4908a" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#3a2e28" media="(prefers-color-scheme: dark)" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SkinLog" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+
+  <link rel="stylesheet" href="assets/app.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <style>
+    * { -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'DM Sans', sans-serif; background-color: #faf7f4; }
+
+    /* Grain texture overlay */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 0;
+    }
+
+    /* Soft warm gradient background */
+    .bg-skin {
+      background: radial-gradient(ellipse at 20% 0%, #f5e8e6 0%, transparent 55%),
+                  radial-gradient(ellipse at 85% 90%, #e5ede4 0%, transparent 50%),
+                  #faf7f4;
+    }
+
+    /* Cards */
+    .card {
+      background: rgba(255,255,255,0.82);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(212,144,138,0.14);
+      box-shadow: 0 2px 20px rgba(58,46,40,0.07), 0 1px 4px rgba(58,46,40,0.04);
+    }
+
+    /* Streak ring */
+    .streak-ring {
+      background: conic-gradient(
+        #d4908a 0deg,
+        #e0b4b0 calc(var(--pct) * 3.6deg),
+        #f2e0de calc(var(--pct) * 3.6deg) 360deg
+      );
+    }
+
+    /* Status dot pulse */
+    @keyframes pulse-ring {
+      0%   { transform: scale(1);   opacity: 0.6; }
+      70%  { transform: scale(1.6); opacity: 0; }
+      100% { transform: scale(1);   opacity: 0; }
+    }
+    .pulse::after {
+      content: '';
+      position: absolute; inset: 0;
+      border-radius: 50%;
+      background: #8fa88a;
+      animation: pulse-ring 2.2s ease-out infinite;
+    }
+
+    /* Nav active indicator */
+    .nav-pill {
+      transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    /* Stagger fade-in for dashboard sections */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp 0.55s ease both; }
+    .delay-1 { animation-delay: 0.08s; }
+    .delay-2 { animation-delay: 0.18s; }
+    .delay-3 { animation-delay: 0.28s; }
+    .delay-4 { animation-delay: 0.38s; }
+
+    /* Bottom nav blur */
+    .nav-bar {
+      background: rgba(250,247,244,0.88);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(212,144,138,0.18);
+    }
+
+    /* Metric chip */
+    .chip {
+      background: linear-gradient(135deg, #f2e0de, #faf7f4);
+      border: 1px solid rgba(212,144,138,0.25);
+    }
+
+    /* ── PHASE 2: LOG SCREEN ── */
+
+    /* View transition */
+    .view { transition: opacity 0.28s ease, transform 0.28s ease; }
+    .view.hidden-view {
+      display: none;
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    .view.active-view {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Custom range slider */
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 99px;
+      outline: none;
+      cursor: pointer;
+      background: linear-gradient(to right,
+        var(--thumb-color, #d4908a) 0%,
+        var(--thumb-color, #d4908a) var(--val, 0%),
+        #f2e0de var(--val, 0%),
+        #f2e0de 100%
+      );
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--thumb-color, #d4908a);
+      box-shadow: 0 2px 8px rgba(212,144,138,0.45);
+      border: 3px solid #fff;
+      transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s ease;
+    }
+    input[type=range]:active::-webkit-slider-thumb {
+      transform: scale(1.25);
+      box-shadow: 0 4px 16px rgba(212,144,138,0.55);
+    }
+    input[type=range]::-moz-range-thumb {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: var(--thumb-color, #d4908a);
+      border: 3px solid #fff;
+      box-shadow: 0 2px 8px rgba(212,144,138,0.45);
+    }
+
+    /* Routine toggle buttons */
+    .routine-toggle {
+      transition: all 0.18s cubic-bezier(0.34,1.56,0.64,1);
+      border: 2px solid transparent;
+      min-height: 44px;
+    }
+    .routine-toggle.active-am {
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+      border-color: #f59e0b;
+      color: #92400e;
+      box-shadow: 0 2px 12px rgba(245,158,11,0.2);
+    }
+    .routine-toggle.active-pm {
+      background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+      border-color: #8b5cf6;
+      color: #4c1d95;
+      box-shadow: 0 2px 12px rgba(139,92,246,0.2);
+    }
+    .routine-toggle:not(.active-am):not(.active-pm) {
+      background: rgba(255,255,255,0.65);
+      border-color: rgba(212,144,138,0.18);
+      color: #9e8a80;
+    }
+    .routine-toggle:active { transform: scale(0.95); }
+
+    /* Notes textarea */
+    .skin-textarea {
+      background: rgba(255,255,255,0.7);
+      border: 1.5px solid rgba(212,144,138,0.2);
+      border-radius: 16px;
+      resize: none;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      color: #3a2e28;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      line-height: 1.6;
+    }
+    .skin-textarea::placeholder { color: #c4b0a8; }
+    .skin-textarea:focus {
+      outline: none;
+      border-color: #d4908a;
+      box-shadow: 0 0 0 3px rgba(212,144,138,0.14);
+    }
+
+    /* Save button shimmer */
+    @keyframes shimmer {
+      0%   { background-position: -200% center; }
+      100% { background-position: 200% center; }
+    }
+    .save-btn {
+      background: linear-gradient(110deg, #b5706a 0%, #d4908a 40%, #e8b8b2 55%, #d4908a 70%, #b5706a 100%);
+      background-size: 200% auto;
+    }
+    .save-btn:hover { animation: shimmer 1.8s linear infinite; }
+
+    /* ── PHASE 5: PHOTO UPLOAD ── */
+
+    /* Upload drop zone */
+    .photo-upload-zone {
+      border: 2px dashed rgba(212,144,138,0.35);
+      border-radius: 18px;
+      background: rgba(242,224,222,0.18);
+      transition: border-color 0.2s, background 0.2s, transform 0.15s;
+      cursor: pointer;
+      min-height: 90px;
+    }
+    .photo-upload-zone:hover,
+    .photo-upload-zone:focus-within {
+      border-color: #d4908a;
+      background: rgba(242,224,222,0.36);
+    }
+    .photo-upload-zone:active { transform: scale(0.985); }
+
+    /* Thumbnail container */
+    .photo-thumb-wrap {
+      position: relative;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .photo-thumb-wrap img {
+      width: 100%; height: 140px;
+      object-fit: cover; display: block;
+      border-radius: 16px;
+      transition: transform 0.3s ease;
+    }
+    .photo-thumb-wrap:active img { transform: scale(0.97); }
+
+    /* Remove photo button */
+    .photo-remove-btn {
+      position: absolute; top: 8px; right: 8px;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: rgba(30,20,16,0.62);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+      transition: transform 0.15s, background 0.15s;
+    }
+    .photo-remove-btn:active { transform: scale(0.88); background: rgba(148,63,58,0.85); }
+
+    /* Date badge over thumbnail */
+    .photo-date-badge {
+      position: absolute; bottom: 8px; left: 8px;
+      background: rgba(30,20,16,0.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      color: #faf7f4;
+      font-size: 10px; font-weight: 700;
+      padding: 3px 8px; border-radius: 99px;
+      letter-spacing: 0.04em;
+    }
+
+    /* History card photo */
+    .history-photo {
+      width: 100%; height: 128px;
+      object-fit: cover;
+      border-radius: 12px;
+      margin-top: 12px;
+      display: block;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 2px 8px rgba(58,46,40,0.1);
+    }
+    .history-photo:active { transform: scale(0.97); }
+
+    /* Photo lightbox overlay */
+    .photo-lightbox {
+      position: fixed; inset: 0; z-index: 300;
+      background: rgba(12,8,6,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 20px;
+      animation: lbFadeIn 0.22s ease both;
+    }
+    .photo-lightbox.hidden { display: none; }
+    @keyframes lbFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .lightbox-img {
+      max-width: 100%; max-height: 72vh;
+      object-fit: contain;
+      border-radius: 16px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+      animation: lbSlideUp 0.28s cubic-bezier(0.34,1.1,0.64,1) both;
+    }
+    @keyframes lbSlideUp {
+      from { opacity: 0; transform: translateY(20px) scale(0.96); }
+      to   { opacity: 1; transform: translateY(0)    scale(1);    }
+    }
+    .lightbox-close {
+      position: absolute; top: 16px; right: 16px;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; cursor: pointer;
+      transition: background 0.15s, transform 0.15s;
+    }
+    .lightbox-close:active { transform: scale(0.88); background: rgba(255,255,255,0.22); }
+    .lightbox-caption {
+      color: rgba(255,255,255,0.6);
+      font-size: 12px; font-weight: 600;
+      letter-spacing: 0.05em; text-transform: uppercase;
+      margin-top: 14px;
+    }
+
+    /* ── PHASE 4: HISTORY & EXPORT ── */
+
+    /* Timeline spine */
+    .timeline-spine {
+      position: absolute;
+      left: 17px; top: 0; bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, #f2e0de, #d4908a 20%, #d4908a 80%, transparent);
+    }
+    .timeline-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      flex-shrink: 0;
+      margin-top: 4px;
+      box-shadow: 0 0 0 2px currentColor;
+    }
+
+    /* Sparkline score bar */
+    .score-bar-track {
+      height: 5px; border-radius: 99px;
+      background: #f2e0de; overflow: hidden;
+    }
+    .score-bar-fill {
+      height: 100%; border-radius: 99px;
+      transition: width 0.6s cubic-bezier(.4,0,.2,1);
+    }
+
+    /* History entry card hover */
+    .history-card {
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+    .history-card:active { transform: scale(0.985); }
+
+    /* Export button */
+    .export-btn {
+      background: linear-gradient(135deg, #3a2e28, #7a6055);
+      box-shadow: 0 4px 20px rgba(58,46,40,0.28);
+    }
+    .export-btn:active { transform: scale(0.97); }
+
+    /* Modal overlay */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(30,20,16,0.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex; align-items: flex-end;
+      transition: opacity 0.3s ease;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-sheet {
+      background: #fff;
+      border-radius: 28px 28px 0 0;
+      width: 100%; max-height: 92vh;
+      overflow-y: auto;
+      box-shadow: 0 -8px 40px rgba(58,46,40,0.18);
+      animation: slideUp 0.35s cubic-bezier(0.34,1.1,0.64,1) both;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    /* Clinical report inside modal */
+    .report-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .report-table th {
+      background: #faf7f4; text-align: left;
+      padding: 8px 10px; font-weight: 600;
+      font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.06em; color: #9e8a80;
+      border-bottom: 1px solid #f2e0de;
+    }
+    .report-table td {
+      padding: 8px 10px; color: #3a2e28;
+      border-bottom: 1px solid #faf7f4;
+      vertical-align: top;
+    }
+    .report-table tr:last-child td { border-bottom: none; }
+    .report-section-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 15px; font-weight: 600;
+      color: #3a2e28; margin: 0 0 8px;
+    }
+    .severity-pill {
+      display: inline-block; padding: 2px 8px;
+      border-radius: 99px; font-size: 11px; font-weight: 600;
+    }
+
+    /* Print styles */
+    @media print {
+      body > *:not(#print-report) { display: none !important; }
+      #print-report {
+        display: block !important;
+        position: static !important;
+        padding: 24px !important;
+        font-size: 12pt;
+      }
+      .no-print { display: none !important; }
+    }
+
+    /* Auth button tap feedback (replaces removed ontouchstart handlers) */
+    #auth-screen button:active { opacity: 0.72; transform: scale(0.97); }
+  </style>
+</head>
+
+<body class="bg-skin min-h-screen">
+
+  <!-- ═══════════════════════════════════════
+       APP SHELL
+  ════════════════════════════════════════ -->
+  <div class="max-w-md mx-auto min-h-screen pb-24 relative z-10">
+
+    <!-- ─── TOP SAFE AREA SPACER ─── -->
+    <div style="height:max(1rem, env(safe-area-inset-top, 0px));"></div>
+
+    <!-- ════════════════════════════
+         DASHBOARD VIEW
+    ═════════════════════════════ -->
+    <main id="view-dashboard" class="view active-view px-5 pt-4 space-y-5">
+
+      <!-- ── HEADER ── -->
+      <header class="fade-up flex items-start justify-between">
+        <div>
+          <p class="text-bark-muted text-sm font-medium tracking-wide uppercase" id="display-greeting">Good morning</p>
+          <h1 class="font-serif text-3xl text-bark leading-tight mt-0.5">
+            Welcome back,<br/>
+            <em class="not-italic font-semibold"><span id="display-username"></span></em>
+          </h1>
+        </div>
+        <!-- Avatar — tap to sign out -->
+        <button onclick="promptRename()" class="w-11 h-11 rounded-2xl overflow-hidden border-2 border-blush-mid shadow-sm flex-shrink-0 mt-1 active:scale-95 transition-transform" title="Account options">
+          <div class="w-full h-full bg-gradient-to-br from-blush-light to-blush-mid flex items-center justify-center">
+            <span id="display-avatar-initial" class="font-serif text-blush-dark text-lg font-semibold"></span>
+          </div>
+        </button>
+      </header>
+
+      <!-- ── DATE STRIP ── -->
+      <div class="fade-up delay-1 flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+        <style>.scrollbar-none::-webkit-scrollbar{display:none}</style>
+        <!-- days of week centered on today -->
+        <script>
+          document.addEventListener('DOMContentLoaded', () => {
+            const strip = document.getElementById('date-strip');
+            const today = new Date();
+            const days  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+            for (let i = -3; i <= 3; i++) {
+              const d   = new Date(today); d.setDate(today.getDate() + i);
+              const isT = i === 0;
+              const btn = document.createElement('button');
+              btn.className = `flex-shrink-0 flex flex-col items-center gap-0.5 px-3 py-2 rounded-2xl transition-all active:scale-95 ${
+                isT ? 'bg-blush text-white shadow-md shadow-blush/30' : 'text-bark-muted'
+              }`;
+              btn.innerHTML = `
+                <span class="text-[10px] font-semibold uppercase tracking-widest">${days[d.getDay()]}</span>
+                <span class="text-base font-semibold">${d.getDate()}</span>
+              `;
+              strip.appendChild(btn);
+            }
+          });
+        </script>
+        <div id="date-strip" class="flex gap-2"></div>
+      </div>
+
+      <!-- ── STREAK CARD ── -->
+      <div class="fade-up delay-2 card rounded-3xl p-5 relative overflow-hidden">
+        <div class="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-blush-light opacity-60 blur-xl pointer-events-none"></div>
+
+        <div class="flex items-center gap-5 relative z-10">
+          <div class="relative flex-shrink-0">
+            <div class="streak-ring w-20 h-20 rounded-full flex items-center justify-center" id="streak-ring" style="--pct:0">
+              <div class="w-[68px] h-[68px] rounded-full bg-white flex flex-col items-center justify-center shadow-inner">
+                <span class="font-serif text-2xl font-semibold text-bark leading-none" id="streak-number">0</span>
+                <span class="text-[9px] text-bark-muted font-semibold tracking-widest uppercase mt-0.5">Days</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex-1">
+            <p class="text-bark-muted text-xs font-semibold uppercase tracking-widest">Current Streak</p>
+            <h2 class="font-serif text-xl text-bark mt-0.5 leading-tight" id="streak-label">
+              Start logging<br/><em class="not-italic font-semibold text-blush">your routine ✦</em>
+            </h2>
+            <p class="text-bark-muted text-xs mt-1.5" id="streak-subtext">Log your first entry to begin your streak.</p>
+          </div>
+        </div>
+
+        <div class="mt-4 relative z-10">
+          <div class="flex justify-between text-[10px] text-bark-muted font-medium mb-1.5 tracking-wide">
+            <span>Progress to 20-day goal</span>
+            <span id="streak-pct-label">0%</span>
+          </div>
+          <div class="h-1.5 bg-blush-light rounded-full overflow-hidden">
+            <div class="h-full rounded-full bg-gradient-to-r from-blush-dark to-blush" id="streak-bar" style="width:0%;transition:width 1.2s cubic-bezier(.4,0,.2,1)"></div>
+          </div>
+        </div>
+
+        <div class="mt-4 flex gap-1.5 flex-wrap relative z-10">
+          <div id="day-dots" class="flex gap-1.5 flex-wrap"></div>
+        </div>
+      </div>
+
+      <!-- ── TODAY'S SKIN STATUS ── -->
+      <div class="fade-up delay-3 card rounded-3xl p-5 relative overflow-hidden">
+        <div class="absolute -left-8 -bottom-8 w-32 h-32 rounded-full bg-sage-light opacity-40 blur-2xl pointer-events-none"></div>
+
+        <div class="relative z-10">
+          <!-- Header row -->
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <p class="text-bark-muted text-xs font-semibold uppercase tracking-widest">Today's Skin Status</p>
+              <h2 class="font-serif text-xl text-bark mt-0.5" id="dashboard-today-date"></h2>
+            </div>
+            <div id="dashboard-log-badge" class="relative flex items-center gap-1.5 chip px-3 py-1.5 rounded-full">
+              <span class="text-[11px] font-semibold text-bark-muted" id="dashboard-log-status">No entry yet</span>
+            </div>
+          </div>
+
+          <!-- Dynamic summary (populated by JS) -->
+          <div id="dashboard-today-summary">
+            <!-- Blank state -->
+            <div class="flex flex-col items-center justify-center py-6 gap-3 text-center">
+              <div class="w-12 h-12 rounded-2xl bg-blush-light flex items-center justify-center">
+                <svg class="w-6 h-6 text-blush-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-bark">No log for today yet</p>
+                <p class="text-xs text-bark-muted mt-1">Tap below to record your skin, routine, and notes.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Log button -->
+          <button onclick="openLogForToday()" class="mt-4 w-full bg-gradient-to-br from-blush to-blush-dark text-white font-semibold text-sm py-3.5 rounded-2xl shadow-md shadow-blush/25 active:scale-95 transition-all hover:shadow-lg hover:shadow-blush/30 flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+            </svg>
+            Log Today's Entry
+          </button>
+        </div>
+      </div>
+
+      <!-- ── QUICK INSIGHTS ── -->
+      <div class="fade-up delay-4 card rounded-3xl p-5 relative overflow-hidden mb-2">
+        <p class="text-xs font-semibold text-bark-muted uppercase tracking-widest mb-3">Quick Insights</p>
+        <div id="dashboard-insights">
+          <div class="flex flex-col items-center justify-center py-4 gap-2 text-center">
+            <span class="text-2xl">📊</span>
+            <p class="text-sm font-semibold text-bark">No data yet</p>
+            <p class="text-xs text-bark-muted">Start logging daily to unlock trend insights here.</p>
+          </div>
+        </div>
+      </div>
+
+    </main>
+    <!-- end dashboard -->
+
+    <!-- ════════════════════════════
+         LOG SCREEN (Phase 2)
+    ═════════════════════════════ -->
+    <main id="view-log" class="view hidden-view px-5 pt-4 pb-6 space-y-5">
+
+      <!-- ── LOG HEADER ── -->
+      <header class="flex items-center justify-between">
+        <div>
+          <p class="text-bark-muted text-xs font-semibold uppercase tracking-widest">Daily Entry</p>
+          <h1 class="font-serif text-3xl text-bark leading-tight mt-0.5">
+            How's your<br/><em class="not-italic font-semibold text-blush">skin today?</em>
+          </h1>
+        </div>
+        <div class="flex flex-col items-end gap-1">
+          <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-blush-light to-blush-mid flex items-center justify-center shadow-sm">
+            <svg class="w-5 h-5 text-blush-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+          </div>
+          <span id="log-date-label" class="text-[10px] text-bark-muted font-semibold"></span>
+        </div>
+      </header>
+
+      <!-- ── EDITING BANNER (shown when amending an existing entry) ── -->
+      <div id="editing-banner" class="hidden flex items-center gap-2 chip px-4 py-2.5 rounded-2xl">
+        <svg class="w-4 h-4 text-blush-dark flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+        </svg>
+        <span id="editing-banner-text" class="flex-1 text-xs font-semibold text-blush-dark">Editing entry</span>
+        <button onclick="cancelEditLog()" class="text-[11px] font-bold text-bark-muted underline underline-offset-2 active:opacity-60">Cancel</button>
+      </div>
+
+      <!-- ── SEVERITY SLIDERS ── -->
+      <div class="card rounded-3xl p-5 space-y-6">
+        <p class="text-xs font-semibold text-bark-muted uppercase tracking-widest">Skin Condition Ratings</p>
+
+        <!-- Breakout Severity -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🔴</span>
+              <span class="text-sm font-semibold text-bark">Breakout Severity</span>
+            </div>
+            <div id="breakout-badge" class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blush-light border border-blush/25 transition-all">
+              <span id="breakout-val" class="text-sm font-bold text-blush-dark">1</span>
+              <span id="breakout-label" class="text-[11px] font-semibold text-blush-dark">Clear</span>
+            </div>
+          </div>
+          <input type="range" id="breakout-slider" min="1" max="5" value="1"
+            style="--thumb-color:#d4908a; --val:0%"
+            oninput="updateSlider('breakout', this.value)"
+            class="w-full" />
+          <div class="flex justify-between mt-2 px-0.5">
+            <span class="text-[10px] text-bark-muted font-medium">Clear</span>
+            <span class="text-[10px] text-bark-muted font-medium">Mild</span>
+            <span class="text-[10px] text-bark-muted font-medium">Moderate</span>
+            <span class="text-[10px] text-bark-muted font-medium">Significant</span>
+            <span class="text-[10px] text-bark-muted font-medium">Severe</span>
+          </div>
+        </div>
+
+        <!-- Divider -->
+        <div class="h-px bg-blush-light/70"></div>
+
+        <!-- Redness / Irritation -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🌡️</span>
+              <span class="text-sm font-semibold text-bark">Redness / Irritation</span>
+            </div>
+            <div id="redness-badge" class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-sage-light border border-sage/25 transition-all">
+              <span id="redness-val" class="text-sm font-bold text-sage-dark">1</span>
+              <span id="redness-label" class="text-[11px] font-semibold text-sage-dark">Calm</span>
+            </div>
+          </div>
+          <input type="range" id="redness-slider" min="1" max="5" value="1"
+            style="--thumb-color:#8fa88a; --val:0%"
+            oninput="updateSlider('redness', this.value)"
+            class="w-full" />
+          <div class="flex justify-between mt-2 px-0.5">
+            <span class="text-[10px] text-bark-muted font-medium">Calm</span>
+            <span class="text-[10px] text-bark-muted font-medium">Faint</span>
+            <span class="text-[10px] text-bark-muted font-medium">Noticeable</span>
+            <span class="text-[10px] text-bark-muted font-medium">Inflamed</span>
+            <span class="text-[10px] text-bark-muted font-medium">Reactive</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ROUTINE TOGGLES ── -->
+      <div class="card rounded-3xl p-5">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-xs font-semibold text-bark-muted uppercase tracking-widest">Routine Completed</p>
+          <div class="flex gap-2">
+            <span class="text-[10px] bg-amber-100 text-amber-700 font-bold px-2 py-1 rounded-lg">AM</span>
+            <span class="text-[10px] bg-indigo-50 text-indigo-500 font-bold px-2 py-1 rounded-lg">PM</span>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <!-- Cleanser -->
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-xl bg-blush-light flex items-center justify-center flex-shrink-0">
+              <span class="text-sm">🧴</span>
+            </div>
+            <span class="flex-1 text-sm font-semibold text-bark">Cleanser</span>
+            <div class="flex gap-2">
+              <button class="routine-toggle w-14 rounded-xl text-[11px] font-bold" data-step="cleanser" data-period="am" onclick="toggleRoutine(this)">AM</button>
+              <button class="routine-toggle w-14 rounded-xl text-[11px] font-bold" data-step="cleanser" data-period="pm" onclick="toggleRoutine(this)">PM</button>
+            </div>
+          </div>
+          <!-- Treatment -->
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-xl bg-sage-light flex items-center justify-center flex-shrink-0">
+              <span class="text-sm">💊</span>
+            </div>
+            <span class="flex-1 text-sm font-semibold text-bark">Treatment</span>
+            <div class="flex gap-2">
+              <button class="routine-toggle w-14 rounded-xl text-[11px] font-bold" data-step="treatment" data-period="am" onclick="toggleRoutine(this)">AM</button>
+              <button class="routine-toggle w-14 rounded-xl text-[11px] font-bold" data-step="treatment" data-period="pm" onclick="toggleRoutine(this)">PM</button>
+            </div>
+          </div>
+          <!-- Moisturizer -->
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-xl bg-blush-light flex items-center justify-center flex-shrink-0">
+              <span class="text-sm">💧</span>
+            </div>
+            <span class="flex-1 text-sm font-semibold text-bark">Moisturizer</span>
+            <div class="flex gap-2">
+              <button class="routine-toggle w-14 rounded-xl text-[11px] font-bold" data-step="moisturizer" data-period="am" onclick="toggleRoutine(this)">AM</button>
+              <button class="routine-toggle w-14 rounded-xl text-[11px] font-bold" data-step="moisturizer" data-period="pm" onclick="toggleRoutine(this)">PM</button>
+            </div>
+          </div>
+          <!-- SPF -->
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+              <span class="text-sm">☀️</span>
+            </div>
+            <span class="flex-1 text-sm font-semibold text-bark">SPF</span>
+            <div class="flex gap-2">
+              <button class="routine-toggle w-14 rounded-xl text-[11px] font-bold" data-step="spf" data-period="am" onclick="toggleRoutine(this)">AM</button>
+              <button class="routine-toggle w-14 rounded-xl text-[11px] font-bold" data-step="spf" data-period="pm" onclick="toggleRoutine(this)" style="opacity:0.38;pointer-events:none" title="SPF is AM only">—</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Completion bar -->
+        <div class="mt-4 pt-4 border-t border-blush-light/60">
+          <div class="flex justify-between text-[11px] text-bark-muted font-semibold mb-1.5">
+            <span>Steps completed</span>
+            <span id="routine-count">0 / 7</span>
+          </div>
+          <div class="h-1.5 bg-blush-light rounded-full overflow-hidden">
+            <div id="routine-progress" class="h-full rounded-full bg-gradient-to-r from-blush-dark to-blush transition-all duration-500" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- ── PROGRESS PHOTO UPLOAD (Phase 5) ── -->
+        <div class="mt-4 pt-4 border-t border-blush-light/60">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="w-6 h-6 rounded-lg bg-blush-light flex items-center justify-center text-xs flex-shrink-0">📸</span>
+            <p class="text-xs font-semibold text-bark-muted uppercase tracking-widest">Progress Photo</p>
+            <span class="text-[10px] text-bark-muted font-medium ml-auto">Optional</span>
+          </div>
+
+          <!-- Hidden file input -->
+          <input type="file" accept="image/*" capture="environment"
+            id="log-photo-input" class="sr-only"
+            onchange="handlePhotoSelect(this)" />
+
+          <!-- Upload zone (shown when no photo selected) -->
+          <label for="log-photo-input" id="photo-upload-zone" class="photo-upload-zone flex flex-col items-center justify-center gap-2 py-5 px-4 select-none">
+            <div class="w-10 h-10 rounded-2xl bg-blush-light flex items-center justify-center">
+              <svg class="w-5 h-5 text-blush-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+            </div>
+            <div class="text-center">
+              <p class="text-sm font-semibold text-bark">Add Progress Photo</p>
+              <p class="text-[11px] text-bark-muted mt-0.5">Tap to take or choose from library</p>
+            </div>
+          </label>
+
+          <!-- Thumbnail preview (shown after selection) -->
+          <div id="photo-preview-wrap" class="photo-thumb-wrap hidden">
+            <img id="photo-preview-img" src="" alt="Progress photo preview" />
+            <!-- Date badge -->
+            <div class="photo-date-badge" id="photo-preview-date"></div>
+            <!-- Remove button -->
+            <button type="button" onclick="clearPhoto()" class="photo-remove-btn" aria-label="Remove photo">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+            <!-- Re-shoot label -->
+            <label for="log-photo-input"
+              class="absolute bottom-2 right-2 flex items-center gap-1 bg-white/80 backdrop-blur text-bark text-[10px] font-bold px-2 py-1 rounded-full cursor-pointer shadow-sm active:scale-90 transition-transform">
+              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0114.83-3.36M20 15a9 9 0 01-14.83 3.36"/>
+              </svg>
+              Retake
+            </label>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── DAILY NOTES ── -->
+      <div class="card rounded-3xl p-5 space-y-4">
+        <p class="text-xs font-semibold text-bark-muted uppercase tracking-widest">Daily Notes & Triggers</p>
+
+        <!-- Diet & Nutrition -->
+        <div>
+          <label class="flex items-center gap-2 text-sm font-semibold text-bark mb-2">
+            <span class="w-6 h-6 rounded-lg bg-green-50 flex items-center justify-center text-xs">🥗</span>
+            Diet & Nutrition
+          </label>
+          <textarea id="note-diet" class="skin-textarea w-full px-4 py-3" rows="2"
+            placeholder="e.g. Dairy-free today, lots of water, avoided sugar…"></textarea>
+        </div>
+
+        <!-- Sleep -->
+        <div>
+          <label class="flex items-center gap-2 text-sm font-semibold text-bark mb-2">
+            <span class="w-6 h-6 rounded-lg bg-indigo-50 flex items-center justify-center text-xs">🌙</span>
+            Sleep Quality
+          </label>
+          <div class="flex gap-2 mb-2">
+            <!-- Quick-select sleep rating -->
+            <button class="sleep-btn flex-1 py-2 rounded-xl text-xs font-bold border-2 border-transparent bg-white/70 text-bark-muted active:scale-95 transition-all" data-sleep="poor"   onclick="setSleep(this)">😞 Poor</button>
+            <button class="sleep-btn flex-1 py-2 rounded-xl text-xs font-bold border-2 border-transparent bg-white/70 text-bark-muted active:scale-95 transition-all" data-sleep="fair"   onclick="setSleep(this)">😐 Fair</button>
+            <button class="sleep-btn flex-1 py-2 rounded-xl text-xs font-bold border-2 border-transparent bg-white/70 text-bark-muted active:scale-95 transition-all" data-sleep="good"   onclick="setSleep(this)">🙂 Good</button>
+            <button class="sleep-btn flex-1 py-2 rounded-xl text-xs font-bold border-2 border-transparent bg-white/70 text-bark-muted active:scale-95 transition-all" data-sleep="great"  onclick="setSleep(this)">😄 Great</button>
+          </div>
+        </div>
+
+        <!-- Triggers / Free notes -->
+        <div>
+          <label class="flex items-center gap-2 text-sm font-semibold text-bark mb-2">
+            <span class="w-6 h-6 rounded-lg bg-blush-light flex items-center justify-center text-xs">⚡</span>
+            Flare-up Triggers / Notes
+          </label>
+          <textarea id="note-triggers" class="skin-textarea w-full px-4 py-3" rows="3"
+            placeholder="e.g. Stressed today, tried new product, skipped workout, humid weather…"></textarea>
+          <p class="text-[11px] text-bark-muted mt-1.5 pl-1">Patterns you notice here will appear in your monthly insights.</p>
+        </div>
+      </div>
+
+      <!-- ── SAVE BUTTON ── -->
+      <div class="pt-1 pb-2">
+        <button id="save-btn" onclick="saveLog()"
+          class="save-btn w-full text-white font-bold text-base py-4 rounded-2xl shadow-lg shadow-blush/30 active:scale-95 transition-transform flex items-center justify-center gap-3">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          Save Today's Log
+        </button>
+        <p class="text-center text-[11px] text-bark-muted mt-2">Entries are saved locally to your device</p>
+      </div>
+
+    </main>
+    <!-- end log screen -->
+
+    <!-- ════════════════════════════
+         HISTORY VIEW (Phase 4)
+    ═════════════════════════════ -->
+    <main id="view-history" class="view hidden-view px-5 pt-4 pb-6 space-y-5">
+
+      <!-- ── HISTORY HEADER ── -->
+      <header class="flex items-start justify-between">
+        <div>
+          <p class="text-bark-muted text-xs font-semibold uppercase tracking-widest">Skin Journey</p>
+          <h1 class="font-serif text-3xl text-bark leading-tight mt-0.5">
+            Your<br/><em class="not-italic font-semibold text-blush">Timeline</em>
+          </h1>
+        </div>
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-blush-light to-blush-mid flex items-center justify-center shadow-sm flex-shrink-0 mt-1">
+          <svg class="w-5 h-5 text-blush-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+      </header>
+
+      <!-- ── EXPORT CTA ── -->
+      <button onclick="openExportModal()"
+        class="export-btn w-full text-white font-bold text-sm py-4 rounded-2xl active:scale-95 transition-transform flex items-center justify-center gap-3">
+        <svg class="w-5 h-5 opacity-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <span>Export Report for Dermatologist</span>
+        <svg class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+        </svg>
+      </button>
+
+      <!-- ── AGGREGATE STATS ROW ── -->
+      <div id="history-stats" class="grid grid-cols-4 gap-2">
+        <!-- populated by renderHistory() -->
+      </div>
+
+      <!-- ── TREND SPARKLINE CARD ── -->
+      <div id="history-trend-card" class="card rounded-3xl p-5 hidden">
+        <p class="text-xs font-semibold text-bark-muted uppercase tracking-widest mb-3">Severity Trend</p>
+        <div class="space-y-3">
+          <div>
+            <div class="flex justify-between text-[11px] font-semibold mb-2">
+              <span class="text-bark">🔴 Breakout</span>
+              <span id="trend-breakout-label" class="text-blush-dark"></span>
+            </div>
+            <div class="flex gap-0.5 items-end h-8" id="sparkline-breakout"></div>
+          </div>
+          <div class="h-px bg-blush-light/60"></div>
+          <div>
+            <div class="flex justify-between text-[11px] font-semibold mb-2">
+              <span class="text-bark">🌡️ Redness</span>
+              <span id="trend-redness-label" class="text-sage-dark"></span>
+            </div>
+            <div class="flex gap-0.5 items-end h-8" id="sparkline-redness"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TIMELINE ── -->
+      <div id="history-timeline" class="relative pl-9 space-y-4">
+        <div class="timeline-spine"></div>
+        <!-- Populated by renderHistory() -->
+      </div>
+
+      <!-- ── EMPTY STATE ── -->
+      <div id="history-empty" class="hidden card rounded-3xl p-8 text-center">
+        <div class="text-4xl mb-3">🌿</div>
+        <h3 class="font-serif text-xl text-bark mb-1">No entries yet</h3>
+        <p class="text-sm text-bark-muted">Tap the <span class="font-bold text-blush">+</span> button to log your first skin entry. Your journey will appear here.</p>
+      </div>
+
+    </main>
+    <!-- end history view -->
+
+  </div>
+  <!-- end app shell -->
+  <!-- ════════════════════════════════════════
+       AUTH SCREEN — static HTML, always in DOM
+       Shown/hidden via display style by showAuthScreen() / dismissAuthScreen()
+  ═════════════════════════════════════════ -->
+  <div id="auth-screen" style="display:none;position:fixed;inset:0;z-index:500;background:linear-gradient(160deg,#fdf8f6 0%,#f5e8e6 50%,#e8f0e7 100%);flex-direction:column;align-items:center;justify-content:flex-end;font-family:'DM Sans',sans-serif;overflow-y:auto;">
+
+    <!-- Hero -->
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px 0;text-align:center;min-height:220px;">
+      <div style="width:72px;height:72px;border-radius:24px;background:linear-gradient(135deg,#d4908a,#b5706a);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(212,144,138,0.35);margin-bottom:20px;">
+        <svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="1.6" style="pointer-events:none"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+      </div>
+      <p style="font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:600;color:#3a2e28;margin:0 0 8px;line-height:1.2;">SkinLog</p>
+      <p style="font-size:14px;color:#9e8a80;margin:0;line-height:1.6;max-width:280px;">Your personal dermatology journal.<br/>Track, understand, and improve your skin.</p>
+    </div>
+
+    <!-- Bottom sheet -->
+    <div style="width:100%;max-width:448px;background:#fff;border-radius:28px 28px 0 0;padding:28px 24px calc(32px + env(safe-area-inset-bottom,0px));box-shadow:0 -12px 48px rgba(58,46,40,0.1);">
+
+      <!-- STEP 1: provider buttons -->
+      <div id="auth-step-providers">
+        <p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#9e8a80;text-align:center;margin:0 0 16px;">Create account or sign in</p>
+
+        <button onclick="showNameStep('google')" style="width:100%;display:flex;align-items:center;justify-content:center;gap:12px;padding:14px 20px;border-radius:14px;border:1.5px solid #e8e0dd;background:#fff;cursor:pointer;margin-bottom:10px;font-size:15px;font-weight:600;color:#3a2e28;box-shadow:0 2px 8px rgba(58,46,40,0.06);">
+          <svg width="20" height="20" viewBox="0 0 48 48" style="pointer-events:none;flex-shrink:0"><path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3 12.9 3 4 11.9 4 23s8.9 20 20 20 20-8.9 20-20c0-1.3-.2-2.7-.5-4z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15.1 16.5 19.2 14 24 14c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3c-7.6 0-14.2 4.6-17.7 11.7z"/><path fill="#FBBC05" d="M24 44c5.9 0 11-2 14.7-5.4l-6.8-5.6C29.9 35.1 27.1 36 24 36c-6.1 0-11.2-4.1-13-9.6l-6.9 5.3C7.7 39.6 15.3 44 24 44z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.8c-.9 2.8-2.8 5-5.3 6.5l6.8 5.6C41.6 37 44 30.9 44 24c0-1.3-.2-2.7-.5-4z"/></svg>
+          Continue with Google
+        </button>
+
+        <button onclick="showNameStep('apple')" style="width:100%;display:flex;align-items:center;justify-content:center;gap:12px;padding:14px 20px;border-radius:14px;border:none;background:#000;cursor:pointer;margin-bottom:10px;font-size:15px;font-weight:600;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.18);">
+          <svg width="17" height="21" viewBox="0 0 814 1000" fill="white" style="pointer-events:none;flex-shrink:0"><path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-57.8-155.5-127.4C46 383.8 7.9 280.7 7.9 182.6c0-31.5 6.4-62.4 20.1-91.4 26.7-61.6 90.7-101.8 162.8-101.8 64.9 0 110.3 45.1 147.9 45.1 35.5 0 91.4-47.7 162.8-47.7 26.4 0 108.2 2.6 166.3 80.2zm-244.8-188.2c31.5-37.6 54.5-89.8 54.5-142 0-7.1-.6-14.3-1.9-20.1-51.5 2-113.7 34.4-149.4 73.2-28.9 32.1-55.7 84.3-55.7 137.2 0 7.7 1.3 15.5 1.9 18.1 3.2.6 8.4 1.3 13.6 1.3 46.4 0 105.1-30.9 136.9-67.7z"/></svg>
+          Continue with Apple
+        </button>
+
+        <button onclick="showNameStep('facebook')" style="width:100%;display:flex;align-items:center;justify-content:center;gap:12px;padding:14px 20px;border-radius:14px;border:none;background:#1877F2;cursor:pointer;margin-bottom:16px;font-size:15px;font-weight:600;color:#fff;box-shadow:0 2px 8px rgba(24,119,242,0.25);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="white" style="pointer-events:none;flex-shrink:0"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+          Continue with Facebook
+        </button>
+
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <div style="flex:1;height:1px;background:#f0e8e6;"></div>
+          <span style="font-size:11px;font-weight:600;color:#c4b0a8;text-transform:uppercase;letter-spacing:0.08em;">or</span>
+          <div style="flex:1;height:1px;background:#f0e8e6;"></div>
+        </div>
+
+        <button onclick="showNameStep('email')" style="width:100%;padding:13px 20px;border-radius:14px;border:1.5px solid rgba(212,144,138,0.35);background:transparent;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;color:#b5706a;cursor:pointer;margin-bottom:14px;">
+          ✉️ Continue with Email
+        </button>
+
+        <p style="text-align:center;font-size:11px;color:#c4b0a8;line-height:1.6;margin:0;">Data stored privately on this device.<br/><span style="color:#d4908a;">Cloud sync coming soon.</span></p>
+      </div>
+
+      <!-- STEP 2: name + optional email -->
+      <div id="auth-step-name" style="display:none;">
+        <button onclick="backToProviders()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#9e8a80;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:18px;padding:0;">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="pointer-events:none"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+          Back
+        </button>
+
+        <div id="auth-provider-badge" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:20px;padding:10px 14px;border-radius:12px;background:#faf7f4;border:1.5px solid #f0e8e6;"></div>
+
+        <p style="font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:600;color:#3a2e28;margin:0 0 4px;">What's your name?</p>
+        <p style="font-size:13px;color:#9e8a80;margin:0 0 16px;">This is how SkinLog will greet you.</p>
+
+        <input id="auth-name-field" type="text" maxlength="32" autocomplete="given-name" placeholder="First name…"
+          style="width:100%;box-sizing:border-box;padding:14px 16px;border-radius:14px;border:1.5px solid #f0e8e6;background:#faf7f4;font-family:'DM Sans',sans-serif;font-size:16px;color:#3a2e28;outline:none;margin-bottom:10px;display:block;" />
+
+        <input id="auth-email-field" type="email" autocomplete="email" placeholder="Email address…"
+          style="display:none;width:100%;box-sizing:border-box;padding:14px 16px;border-radius:14px;border:1.5px solid #f0e8e6;background:#faf7f4;font-family:'DM Sans',sans-serif;font-size:16px;color:#3a2e28;outline:none;margin-bottom:10px;" />
+
+        <p id="auth-field-error" style="display:none;color:#943f3a;font-size:12px;font-weight:600;margin:0 0 10px;padding:8px 12px;background:#fdf2f2;border-radius:10px;">Please enter your name to continue.</p>
+
+        <button onclick="completeAuth()" style="width:100%;padding:15px;border-radius:14px;border:none;background:linear-gradient(110deg,#b5706a,#d4908a);color:#fff;font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 4px 16px rgba(212,144,138,0.3);">
+          Get Started ✦
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+
+
+
+  <!-- ═══════════════════════════════════════
+       STICKY BOTTOM NAVIGATION
+  ════════════════════════════════════════ -->
+  <nav class="nav-bar fixed bottom-0 left-0 right-0 z-50 pb-safe">
+    <div class="max-w-md mx-auto flex items-center justify-around px-4 h-16">
+
+      <!-- Dashboard (active) -->
+      <button onclick="setNav('dashboard', this)"
+        class="nav-btn flex flex-col items-center gap-1 min-w-[64px] py-2 px-3 rounded-2xl nav-pill active-nav"
+        data-view="dashboard">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+        </svg>
+        <span class="text-[10px] font-semibold tracking-wide">Dashboard</span>
+      </button>
+
+      <!-- Log (FAB-style center) -->
+      <button onclick="openLogForToday()"
+        class="nav-btn relative flex flex-col items-center gap-1 min-w-[64px]"
+        data-view="log">
+        <div class="w-14 h-14 -mt-7 rounded-2xl bg-gradient-to-br from-blush to-blush-dark shadow-lg shadow-blush/40 flex items-center justify-center active:scale-95 transition-transform">
+          <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+          </svg>
+        </div>
+        <span class="text-[10px] font-semibold tracking-wide text-blush-dark">Log</span>
+      </button>
+
+      <!-- History -->
+      <button onclick="setNav('history', this)"
+        class="nav-btn flex flex-col items-center gap-1 min-w-[64px] py-2 px-3 rounded-2xl nav-pill"
+        data-view="history">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span class="text-[10px] font-semibold tracking-wide">History</span>
+      </button>
+
+    </div>
+  </nav>
+
+  <!-- Hidden canvas for photo compression (Phase 5) -->
+  <canvas id="photo-compress-canvas" style="display:none;position:absolute;pointer-events:none" aria-hidden="true"></canvas>
+
+  <!-- Hidden file input for restoring a JSON backup (Account menu) -->
+  <input type="file" accept="application/json" id="backup-restore-input" class="sr-only" onchange="handleRestoreFile(this)" />
+
+  <!-- ════════════════════════════
+       EXPORT MODAL (Phase 4)
+  ═════════════════════════════ -->
+  <div id="export-modal" class="modal-overlay hidden" onclick="handleModalBackdrop(event)">
+    <div class="modal-sheet" id="print-report">
+
+      <!-- Modal drag handle -->
+      <div class="flex justify-center pt-3 pb-1 no-print">
+        <div class="w-10 h-1 rounded-full bg-gray-200"></div>
+      </div>
+
+      <!-- Modal header -->
+      <div class="px-6 py-4 border-b border-gray-100 flex items-start justify-between">
+        <div>
+          <p class="text-[10px] font-bold uppercase tracking-widest text-bark-muted">SkinLog · Clinical Summary</p>
+          <h2 class="font-serif text-2xl text-bark mt-0.5">Patient Skin Report</h2>
+          <p class="text-xs text-bark-muted mt-1" id="report-meta"></p>
+        </div>
+        <button onclick="closeExportModal()" class="no-print w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 active:scale-90 transition-transform mt-1 flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Report body injected by openExportModal() -->
+      <div class="px-6 py-5 space-y-6" id="report-body"></div>
+
+      <!-- Modal footer actions -->
+      <div class="px-6 pb-10 pt-2 flex gap-3 no-print">
+        <button onclick="closeExportModal()"
+          class="flex-1 py-3.5 rounded-2xl border-2 border-blush-mid text-blush-dark font-bold text-sm active:scale-95 transition-transform">
+          Close
+        </button>
+        <button onclick="window.print()"
+          class="flex-1 py-3.5 rounded-2xl bg-gradient-to-br from-bark to-bark-light text-white font-bold text-sm active:scale-95 transition-transform flex items-center justify-center gap-2 shadow-md">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+          </svg>
+          Print / Save PDF
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <style>
+    /* Nav states */
+    .active-nav {
+      background: linear-gradient(135deg, #f2e0de, #faf7f4);
+      color: #b5706a;
+    }
+    .active-nav svg { stroke: #b5706a; }
+    .active-nav span { color: #b5706a; }
+
+    .nav-btn:not(.active-nav) svg  { stroke: #9e8a80; }
+    .nav-btn:not(.active-nav) span { color: #9e8a80; }
+
+    /* Bottom safe area for notched phones */
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  </style>
+
+  <script>
+    /* ══════════════════════════════════════════════
+       CONSTANTS & HELPERS
+    ══════════════════════════════════════════════ */
+    const VIEWS = ['dashboard','log','history'];
+    const BREAKOUT_LABELS = ['','Clear','Mild','Moderate','Significant','Severe'];
+    const REDNESS_LABELS  = ['','Calm','Faint','Noticeable','Inflamed','Reactive'];
+    const BREAKOUT_COLORS = ['','#d4908a','#c77c74','#b8685e','#a85450','#943f3a'];
+    const REDNESS_COLORS  = ['','#8fa88a','#7a9a74','#668b60','#527a4c','#3e693a'];
+    const SLEEP_EMOJI     = { poor:'😞', fair:'😐', good:'🙂', great:'😄', 'not set':'—' };
+
+    /** Escapes HTML-significant characters before text goes into innerHTML.
+     *  Every field a user can type (name, notes, triggers) must pass through
+     *  this before being interpolated into a template string. */
+    function escapeHtml(str) {
+      return String(str ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    /** Local-timezone YYYY-MM-DD key, stable for matching/sorting/dedup
+     *  (unlike toLocaleDateString(), which is a display string). */
+    function isoDate(d) {
+      const tz = d.getTimezoneOffset() * 60000;
+      return new Date(d.getTime() - tz).toISOString().slice(0, 10);
+    }
+
+    function uid() {
+      return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    /** Lightweight toast — replaces silent failures / native alert() for
+     *  transient confirmations and errors. */
+    function showToast(message, type = 'info') {
+      document.getElementById('sl-toast')?.remove();
+      const palette = {
+        success: { bg: '#eef5ed', border: '#8fa88a', color: '#3f5c3c' },
+        error:   { bg: '#fdf2f2', border: '#c77c74', color: '#943f3a' },
+        info:    { bg: '#faf7f4', border: '#d4908a', color: '#7a6055' },
+      };
+      const c = palette[type] || palette.info;
+      const el = document.createElement('div');
+      el.id = 'sl-toast';
+      el.setAttribute('role', 'status');
+      el.style.cssText = `
+        position:fixed; left:50%; bottom:88px; transform:translateX(-50%) translateY(12px);
+        z-index:600; max-width:calc(100% - 40px); background:${c.bg}; border:1.5px solid ${c.border};
+        color:${c.color}; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600;
+        padding:12px 18px; border-radius:14px; box-shadow:0 8px 24px rgba(58,46,40,0.16);
+        opacity:0; transition:opacity 0.25s ease, transform 0.25s ease; text-align:center;`;
+      el.textContent = message;
+      document.body.appendChild(el);
+      requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateX(-50%) translateY(0)'; });
+      setTimeout(() => {
+        el.style.opacity = '0'; el.style.transform = 'translateX(-50%) translateY(12px)';
+        setTimeout(() => el.remove(), 300);
+      }, 2600);
+    }
+
+    /** Generic inline confirm dialog — the app avoids native confirm()/alert(),
+     *  so destructive actions (delete entry, restore backup) route through this. */
+    function showConfirmDialog({ title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false, onConfirm }) {
+      document.getElementById('sl-confirm-overlay')?.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'sl-confirm-overlay';
+      overlay.className = 'modal-overlay';
+      overlay.style.zIndex = '250';
+      overlay.style.alignItems = 'center';
+      overlay.innerHTML = `
+        <div style="background:#fff;border-radius:24px;max-width:340px;width:calc(100% - 40px);margin:0 auto;padding:24px;box-shadow:0 12px 40px rgba(58,46,40,0.2);animation:lbSlideUp 0.25s cubic-bezier(.34,1.1,.64,1) both;">
+          <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:#3a2e28;margin:0 0 8px;">${escapeHtml(title)}</h3>
+          <p style="font-size:13px;color:#7a6055;line-height:1.55;margin:0 0 20px;">${message}</p>
+          <div style="display:flex;gap:10px;">
+            <button id="sl-confirm-cancel" style="flex:1;padding:12px;border-radius:14px;border:1.5px solid #f0e8e6;background:#fff;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;color:#7a6055;">${escapeHtml(cancelLabel)}</button>
+            <button id="sl-confirm-ok" style="flex:1;padding:12px;border-radius:14px;border:none;background:${danger ? 'linear-gradient(110deg,#943f3a,#c77c74)' : 'linear-gradient(110deg,#b5706a,#d4908a)'};font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;color:#fff;">${escapeHtml(confirmLabel)}</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      document.body.style.overflow = 'hidden';
+      const close = () => { overlay.remove(); document.body.style.overflow = ''; };
+      overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+      document.getElementById('sl-confirm-cancel').onclick = close;
+      document.getElementById('sl-confirm-ok').onclick = () => { close(); onConfirm && onConfirm(); };
+    }
+
+    /* ── USERNAME ── */
+    let userName = localStorage.getItem('skinlog-username') || '';
+
+    function getGreeting() {
+      const h = new Date().getHours();
+      if (h < 12) return 'Good morning';
+      if (h < 17) return 'Good afternoon';
+      return 'Good evening';
+    }
+
+    /** Write name to localStorage and refresh every DOM element that shows it */
+    function setUserName(name) {
+      name = (name || '').trim();
+      if (!name) return;
+      userName = name;
+      localStorage.setItem('skinlog-username', name);
+
+      const el = document.getElementById('display-username');
+      if (el) el.textContent = name + ' ✦';
+
+      const av = document.getElementById('display-avatar-initial');
+      if (av) av.textContent = name.charAt(0).toUpperCase();
+
+      const gr = document.getElementById('display-greeting');
+      if (gr) gr.textContent = getGreeting();
+    }
+
+    /** Reads entries and migrates legacy records (no id / no ISO dateKey) in place. */
+    function getLogs() {
+      let arr;
+      try { arr = JSON.parse(localStorage.getItem('skinlog-entries') || '[]'); }
+      catch (e) { arr = []; }
+      let migrated = false;
+      arr.forEach(l => {
+        if (!l.id) { l.id = uid(); migrated = true; }
+        if (!l.dateKey) {
+          const parsed = new Date(l.date);
+          l.dateKey = isNaN(parsed) ? isoDate(new Date()) : isoDate(parsed);
+          migrated = true;
+        }
+      });
+      if (migrated) saveLogs(arr);
+      return arr;
+    }
+    /** Persists entries; returns false (and toasts) if storage write failed,
+     *  e.g. quota exceeded from accumulated photos, so callers can react
+     *  instead of silently losing the entry. */
+    function saveLogs(arr) {
+      try {
+        localStorage.setItem('skinlog-entries', JSON.stringify(arr));
+        return true;
+      } catch (e) {
+        showToast('Could not save — device storage is full. Try removing an old photo.', 'error');
+        return false;
+      }
+    }
+    function avg(arr) {
+      if (!arr.length) return 0;
+      return (arr.reduce((a,b) => a+b, 0) / arr.length).toFixed(1);
+    }
+    function trendArrow(vals) {
+      if (vals.length < 2) return { arrow:'—', color:'#9e8a80', label:'Insufficient data' };
+      const first = vals.slice(0, Math.ceil(vals.length/2));
+      const last  = vals.slice(Math.floor(vals.length/2));
+      const delta = avg(last) - avg(first);
+      if (delta < -0.3) return { arrow:'↓', color:'#607a5c', label:'Improving' };
+      if (delta >  0.3) return { arrow:'↑', color:'#943f3a', label:'Worsening' };
+      return { arrow:'→', color:'#b5706a', label:'Stable' };
+    }
+    function severityColor(v) {
+      v = parseInt(v);
+      const map = { 1:'#8fa88a', 2:'#d4908a', 3:'#c77c74', 4:'#a85450', 5:'#943f3a' };
+      return map[v] || '#d4908a';
+    }
+    function severityBg(v) {
+      v = parseInt(v);
+      const map = { 1:'#dde8db', 2:'#f2e0de', 3:'#f2e0de', 4:'#f2e0de', 5:'#f2e0de' };
+      return map[v] || '#f2e0de';
+    }
+
+    /* seedDemoData removed — app starts as a clean blank slate */
+
+    /* ══════════════════════════════════════════════
+       VIEW NAVIGATION
+    ══════════════════════════════════════════════ */
+    function setNav(viewId, btn) {
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active-nav'));
+      if (viewId !== 'log') {
+        const target = document.querySelector(`[data-view="${viewId}"]`);
+        if (target) target.classList.add('active-nav');
+      } else {
+        btn && btn.classList.add('active-nav');
+        setTimeout(() => btn && btn.classList.remove('active-nav'), 300);
+      }
+
+      VIEWS.forEach(id => {
+        const el = document.getElementById(`view-${id}`);
+        if (!el) return;
+        if (id === viewId) {
+          el.classList.remove('hidden-view');
+          el.classList.add('active-view');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          if (id === 'history')   renderHistory();
+          if (id === 'dashboard') hydrateDashboard();
+        } else {
+          el.classList.remove('active-view');
+          el.classList.add('hidden-view');
+        }
+      });
+    }
+
+    /* ══════════════════════════════════════════════
+       SLIDER LOGIC
+    ══════════════════════════════════════════════ */
+    function updateSlider(type, val) {
+      val = parseInt(val);
+      const pct    = ((val - 1) / 4) * 100;
+      const slider = document.getElementById(`${type}-slider`);
+      const labels = type === 'breakout' ? BREAKOUT_LABELS : REDNESS_LABELS;
+      const colors = type === 'breakout' ? BREAKOUT_COLORS : REDNESS_COLORS;
+      const color  = colors[val];
+      slider.style.setProperty('--val', pct + '%');
+      slider.style.setProperty('--thumb-color', color);
+      document.getElementById(`${type}-val`).textContent   = val;
+      document.getElementById(`${type}-label`).textContent = labels[val];
+      const badge = document.getElementById(`${type}-badge`);
+      badge.style.background  = `linear-gradient(135deg, ${color}22, ${color}11)`;
+      badge.style.borderColor = `${color}55`;
+      badge.querySelectorAll('span').forEach(s => s.style.color = color);
+    }
+
+    /* ══════════════════════════════════════════════
+       ROUTINE TOGGLES
+    ══════════════════════════════════════════════ */
+    function toggleRoutine(btn) {
+      const cls = btn.dataset.period === 'am' ? 'active-am' : 'active-pm';
+      btn.classList.toggle(cls);
+      updateRoutineProgress();
+    }
+    function updateRoutineProgress() {
+      const total  = document.querySelectorAll('.routine-toggle:not([style*="pointer-events:none"])').length;
+      const active = document.querySelectorAll('.routine-toggle.active-am, .routine-toggle.active-pm').length;
+      document.getElementById('routine-count').textContent    = `${active} / ${total}`;
+      document.getElementById('routine-progress').style.width = `${(active / total) * 100}%`;
+    }
+
+    /* ══════════════════════════════════════════════
+       SLEEP QUICK-SELECT
+    ══════════════════════════════════════════════ */
+    const SLEEP_STYLES = {
+      poor:  { bg:'#fef2f2', border:'#fca5a5', color:'#991b1b' },
+      fair:  { bg:'#fefce8', border:'#fde047', color:'#854d0e' },
+      good:  { bg:'#f0fdf4', border:'#86efac', color:'#166534' },
+      great: { bg:'#eff6ff', border:'#93c5fd', color:'#1e3a8a' },
+    };
+    function setSleep(btn) {
+      document.querySelectorAll('.sleep-btn').forEach(b => {
+        b.style.background = b.style.borderColor = b.style.color = '';
+      });
+      const s = SLEEP_STYLES[btn.dataset.sleep];
+      btn.style.background = s.bg; btn.style.borderColor = s.border; btn.style.color = s.color;
+    }
+
+    /* ══════════════════════════════════════════════
+       PHASE 5 — CANVAS PHOTO COMPRESSION
+       Pipeline: File → FileReader → <img> → <canvas>
+       → toDataURL('image/jpeg', 0.6) capped at 400px wide
+       Typical output: raw 3–8 MB photo → ~25–60 KB string
+    ══════════════════════════════════════════════ */
+    const PHOTO_MAX_W   = 400;   // max output width in px
+    const PHOTO_QUALITY = 0.6;   // JPEG compression quality (0–1)
+
+    let _pendingPhotoDataUrl   = null;  // newly-compressed data URL ready for saveLog()
+    let _photoExplicitlyCleared = false; // user tapped the × on an existing photo
+    let _editingEntryId        = null;  // id of the entry being edited, or null for a fresh entry
+    let _editingOriginalPhoto  = null;  // photo carried over from the entry being edited
+
+    /**
+     * compressPhoto(file, onDone)
+     * Reads a File, draws it on #photo-compress-canvas at ≤400px wide,
+     * exports as JPEG/0.6, and calls onDone(dataUrl|null).
+     */
+    function compressPhoto(file, onDone) {
+      if (!file) { onDone(null); return; }
+      const reader = new FileReader();
+      reader.onerror = () => onDone(null);
+      reader.onload  = function(ev) {
+        const sourceImg = new Image();
+        sourceImg.onerror = () => onDone(null);
+        sourceImg.onload  = function() {
+          const canvas = document.getElementById('photo-compress-canvas');
+          let w = sourceImg.naturalWidth  || sourceImg.width;
+          let h = sourceImg.naturalHeight || sourceImg.height;
+
+          // Downscale proportionally if wider than PHOTO_MAX_W
+          if (w > PHOTO_MAX_W) {
+            h = Math.round(h * PHOTO_MAX_W / w);
+            w = PHOTO_MAX_W;
+          }
+
+          canvas.width  = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, w, h);
+
+          // Respect EXIF orientation on iOS by using CSS image-orientation:
+          // drawImage always uses the raw bitmap, so we just draw straight.
+          ctx.drawImage(sourceImg, 0, 0, w, h);
+
+          const compressed = canvas.toDataURL('image/jpeg', PHOTO_QUALITY);
+
+          // Safety: if canvas tainted or toDataURL fails, compressed will be
+          // the empty-image string; treat that as null.
+          onDone(compressed.length > 200 ? compressed : null);
+        };
+        sourceImg.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    /** Called when user picks/takes a photo on the Log screen */
+    function handlePhotoSelect(input) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+
+      // Show a subtle loading shimmer on the upload zone while compressing
+      const zone  = document.getElementById('photo-upload-zone');
+      const wrap  = document.getElementById('photo-preview-wrap');
+      zone.style.opacity = '0.5';
+
+      compressPhoto(file, function(dataUrl) {
+        zone.style.opacity = '';
+
+        if (!dataUrl) {
+          // Compression failed — silently skip photo (entry will save without it)
+          clearPhoto();
+          return;
+        }
+
+        _pendingPhotoDataUrl = dataUrl;
+
+        // Reveal thumbnail preview
+        const img   = document.getElementById('photo-preview-img');
+        const badge = document.getElementById('photo-preview-date');
+        img.src           = dataUrl;
+        badge.textContent = new Date().toLocaleDateString('en-US',
+          { month:'short', day:'numeric', year:'numeric' });
+        zone.classList.add('hidden');
+        wrap.classList.remove('hidden');
+      });
+    }
+
+    /** Resets photo state — called by × button (marks photo removed) and on form reset */
+    function clearPhoto() {
+      _pendingPhotoDataUrl = null;
+      _photoExplicitlyCleared = true;
+      const input = document.getElementById('log-photo-input');
+      if (input) input.value = '';
+      const img = document.getElementById('photo-preview-img');
+      if (img) img.src = '';
+      document.getElementById('photo-preview-wrap')?.classList.add('hidden');
+      document.getElementById('photo-upload-zone')?.classList.remove('hidden');
+
+      // Release canvas memory
+      const canvas = document.getElementById('photo-compress-canvas');
+      if (canvas) { canvas.width = 1; canvas.height = 1; }
+    }
+
+    /** Resolves what photo value the current form represents:
+     *  a newly picked file, an explicit removal, or (when editing) the
+     *  original photo carried over untouched. */
+    function resolveFormPhoto(onDone) {
+      const file = document.getElementById('log-photo-input').files?.[0];
+      if (_pendingPhotoDataUrl) { onDone(_pendingPhotoDataUrl); return; }
+      if (file) { compressPhoto(file, onDone); return; }
+      if (_photoExplicitlyCleared) { onDone(null); return; }
+      onDone(_editingOriginalPhoto || null);
+    }
+
+    /** Clears the whole log form back to a blank entry and exits edit mode. */
+    function resetLogForm() {
+      _editingEntryId = null;
+      _editingOriginalPhoto = null;
+      _pendingPhotoDataUrl = null;
+      _photoExplicitlyCleared = false;
+
+      const bSlider = document.getElementById('breakout-slider');
+      const rSlider = document.getElementById('redness-slider');
+      bSlider.value = 1; updateSlider('breakout', 1);
+      rSlider.value = 1; updateSlider('redness', 1);
+      document.querySelectorAll('.routine-toggle').forEach(b => b.classList.remove('active-am', 'active-pm'));
+      updateRoutineProgress();
+      document.getElementById('note-diet').value = '';
+      document.getElementById('note-triggers').value = '';
+      document.querySelectorAll('.sleep-btn').forEach(b => { b.style.background = b.style.borderColor = b.style.color = ''; });
+
+      const input = document.getElementById('log-photo-input');
+      if (input) input.value = '';
+      const img = document.getElementById('photo-preview-img');
+      if (img) img.src = '';
+      document.getElementById('photo-preview-wrap')?.classList.add('hidden');
+      document.getElementById('photo-upload-zone')?.classList.remove('hidden');
+
+      const label = document.getElementById('log-date-label');
+      if (label) label.textContent = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      updateLogHeader(false);
+    }
+
+    /** Populates the log form's inputs from an existing entry, for editing. */
+    function loadEntryIntoForm(entry) {
+      const bSlider = document.getElementById('breakout-slider');
+      const rSlider = document.getElementById('redness-slider');
+      bSlider.value = entry.breakout; updateSlider('breakout', entry.breakout);
+      rSlider.value = entry.redness;  updateSlider('redness', entry.redness);
+
+      document.querySelectorAll('.routine-toggle').forEach(b => {
+        b.classList.remove('active-am', 'active-pm');
+        const key = `${b.dataset.step}-${b.dataset.period}`;
+        if ((entry.routine || []).includes(key)) b.classList.add(b.dataset.period === 'am' ? 'active-am' : 'active-pm');
+      });
+      updateRoutineProgress();
+
+      document.getElementById('note-diet').value = entry.diet || '';
+      document.getElementById('note-triggers').value = entry.triggers || '';
+
+      document.querySelectorAll('.sleep-btn').forEach(b => {
+        b.style.background = b.style.borderColor = b.style.color = '';
+        if (b.dataset.sleep === entry.sleep) setSleep(b);
+      });
+
+      _pendingPhotoDataUrl = null;
+      _photoExplicitlyCleared = false;
+      _editingOriginalPhoto = entry.photo || null;
+      const img = document.getElementById('photo-preview-img');
+      const zone = document.getElementById('photo-upload-zone');
+      const wrap = document.getElementById('photo-preview-wrap');
+      if (entry.photo) {
+        img.src = entry.photo;
+        document.getElementById('photo-preview-date').textContent = entry.date;
+        zone.classList.add('hidden'); wrap.classList.remove('hidden');
+      } else {
+        img.src = ''; zone.classList.remove('hidden'); wrap.classList.add('hidden');
+      }
+    }
+
+    /** Shows/hides the "you're editing an existing entry" banner on the Log screen. */
+    function updateLogHeader(isEditing, entry) {
+      const banner = document.getElementById('editing-banner');
+      const text = document.getElementById('editing-banner-text');
+      if (!banner || !text) return;
+      if (isEditing && entry) {
+        const todayKey = isoDate(new Date());
+        text.textContent = entry.dateKey === todayKey ? "Updating today's entry" : `Editing entry from ${entry.date}`;
+        banner.classList.remove('hidden');
+      } else {
+        banner.classList.add('hidden');
+      }
+    }
+
+    /** Opens the Log screen pre-filled with an existing entry (from History). */
+    function openLogForEntry(entry) {
+      _editingEntryId = entry.id;
+      loadEntryIntoForm(entry);
+      const label = document.getElementById('log-date-label');
+      if (label) label.textContent = entry.date;
+      updateLogHeader(true, entry);
+      setNav('log', document.querySelector('[data-view="log"]'));
+    }
+
+    function editEntryById(id) {
+      const entry = getLogs().find(l => l.id === id);
+      if (entry) openLogForEntry(entry);
+    }
+
+    /** Opens the Log screen for today — loads today's entry for amending if
+     *  one already exists, otherwise starts blank. Used by nav + dashboard CTA. */
+    function openLogForToday() {
+      resetLogForm();
+      const todayEntry = getLogs().find(l => l.dateKey === isoDate(new Date()));
+      if (todayEntry) {
+        _editingEntryId = todayEntry.id;
+        loadEntryIntoForm(todayEntry);
+        updateLogHeader(true, todayEntry);
+      }
+      setNav('log', document.querySelector('[data-view="log"]'));
+    }
+
+    function cancelEditLog() {
+      resetLogForm();
+      setNav('dashboard', document.querySelector('[data-view="dashboard"]'));
+    }
+
+    /* ══════════════════════════════════════════════
+       SAVE LOG  (Phase 5 — canvas-compressed photo; upserts by date/id)
+    ══════════════════════════════════════════════ */
+    function saveLog() {
+      const btn = document.getElementById('save-btn');
+      btn.disabled      = true;
+      btn.style.opacity = '0.75';
+
+      function _commit(photoDataUrl) {
+        const logs = getLogs();
+        const editing = _editingEntryId ? logs.find(l => l.id === _editingEntryId) : null;
+        const dateKey = editing ? editing.dateKey : isoDate(new Date());
+        const date    = editing ? editing.date    : new Date().toLocaleDateString();
+
+        const entry = {
+          id:       editing ? editing.id : uid(),
+          dateKey,
+          date,
+          breakout: document.getElementById('breakout-slider').value,
+          redness:  document.getElementById('redness-slider').value,
+          routine:  [...document.querySelectorAll('.routine-toggle.active-am,.routine-toggle.active-pm')]
+                      .map(b => `${b.dataset.step}-${b.dataset.period}`),
+          diet:     document.getElementById('note-diet').value,
+          triggers: document.getElementById('note-triggers').value,
+          sleep:    document.querySelector('.sleep-btn[style*="background"]')?.dataset.sleep || 'not set',
+          photo:    photoDataUrl || null,   // compressed JPEG data URL or null
+        };
+
+        // Upsert: editing replaces by id; a fresh save replaces any existing
+        // entry for the same day instead of creating a duplicate.
+        const idx = editing
+          ? logs.findIndex(l => l.id === editing.id)
+          : logs.findIndex(l => l.dateKey === dateKey);
+        if (idx >= 0) logs[idx] = entry; else logs.unshift(entry);
+
+        const ok = saveLogs(logs);
+
+        btn.disabled      = false;
+        btn.style.opacity = '1';
+
+        if (!ok) return; // saveLogs() already surfaced the error via toast
+
+        btn.innerHTML     = `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>Entry Saved!`;
+        btn.style.background = 'linear-gradient(110deg,#607a5c,#8fa88a)';
+        btn.style.animation  = 'none';
+
+        const wasEditingPastEntry = !!editing && editing.dateKey !== isoDate(new Date());
+
+        setTimeout(() => {
+          btn.innerHTML = `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Save Today's Log`;
+          btn.style.background = '';
+          resetLogForm();
+          const dest = wasEditingPastEntry ? 'history' : 'dashboard';
+          setNav(dest, document.querySelector(`[data-view="${dest}"]`));
+        }, 1600);
+      }
+
+      resolveFormPhoto(_commit);
+    }
+
+    /* ══════════════════════════════════════════════
+       HISTORY RENDERER  (Phase 4)
+    ══════════════════════════════════════════════ */
+    function renderHistory() {
+      const logs = getLogs();
+      const timeline = document.getElementById('history-timeline');
+      const empty    = document.getElementById('history-empty');
+      const statsEl  = document.getElementById('history-stats');
+      const trendCard= document.getElementById('history-trend-card');
+
+      // Clear previous render (keep spine div)
+      [...timeline.children].forEach(c => { if (!c.classList.contains('timeline-spine')) c.remove(); });
+      statsEl.innerHTML = '';
+
+      if (logs.length === 0) {
+        empty.classList.remove('hidden');
+        trendCard.classList.add('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      /* ── AGGREGATE STATS ── */
+      const bVals = logs.map(l => parseInt(l.breakout));
+      const rVals = logs.map(l => parseInt(l.redness));
+      const avgB  = avg(bVals);
+      const avgR  = avg(rVals);
+      const bestB = Math.min(...bVals);
+      const totalRoutineSteps = logs.reduce((acc,l) => acc + (l.routine?.length||0), 0);
+      const avgRoutine = (totalRoutineSteps / (logs.length * 7) * 100).toFixed(0);
+
+      const statItems = [
+        { label:'Entries',   value: logs.length,     sub:'logged',    bg:'#f2e0de', color:'#b5706a' },
+        { label:'Avg Break', value: avgB,             sub:'out of 5',  bg:'#f2e0de', color:'#943f3a' },
+        { label:'Avg Red.',  value: avgR,             sub:'out of 5',  bg:'#dde8db', color:'#607a5c' },
+        { label:'Routine',   value: avgRoutine+'%',   sub:'completed', bg:'#fef3c7', color:'#92400e' },
+      ];
+      statItems.forEach(s => {
+        const el = document.createElement('div');
+        el.className = 'rounded-2xl p-3 text-center';
+        el.style.background = s.bg + '80';
+        el.innerHTML = `
+          <div class="font-serif text-xl font-semibold" style="color:${s.color}">${s.value}</div>
+          <div class="text-[9px] font-bold uppercase tracking-wider text-bark-muted leading-tight mt-0.5">${s.label}</div>
+          <div class="text-[9px] text-bark-muted">${s.sub}</div>`;
+        statsEl.appendChild(el);
+      });
+
+      /* ── SPARKLINES ── */
+      const recent = logs.slice(0, 14).reverse(); // oldest→newest for chart
+      trendCard.classList.remove('hidden');
+      buildSparkline('sparkline-breakout', recent.map(l=>parseInt(l.breakout)), BREAKOUT_COLORS);
+      buildSparkline('sparkline-redness',  recent.map(l=>parseInt(l.redness)),  REDNESS_COLORS);
+      const bTrend = trendArrow(recent.map(l=>parseInt(l.breakout)));
+      const rTrend = trendArrow(recent.map(l=>parseInt(l.redness)));
+      document.getElementById('trend-breakout-label').textContent = `${bTrend.arrow} ${bTrend.label}`;
+      document.getElementById('trend-breakout-label').style.color = bTrend.color;
+      document.getElementById('trend-redness-label').textContent  = `${rTrend.arrow} ${rTrend.label}`;
+      document.getElementById('trend-redness-label').style.color  = rTrend.color;
+
+      /* ── TIMELINE CARDS ── */
+      logs.forEach((entry, idx) => {
+        const b  = parseInt(entry.breakout);
+        const r  = parseInt(entry.redness);
+        const bC = severityColor(b);
+        const rC = REDNESS_COLORS[r] || '#8fa88a';
+        const routinePct = Math.round((entry.routine?.length||0) / 7 * 100);
+        const isLatest   = idx === 0;
+        const dateSafe   = escapeHtml(entry.date);
+
+        const wrap = document.createElement('div');
+        wrap.className = 'flex gap-3 items-start';
+        wrap.innerHTML = `
+          <!-- Timeline dot -->
+          <div class="timeline-dot mt-1 flex-shrink-0" style="background:${bC}; color:${bC}"></div>
+
+          <!-- Card -->
+          <div class="history-card card flex-1 rounded-2xl p-4 mb-1 ${isLatest ? 'ring-2 ring-blush/40' : ''}">
+            <!-- Row 1: date + sleep + edit/delete -->
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <p class="text-[10px] font-bold uppercase tracking-widest text-bark-muted">${isLatest ? '⭐ Latest · ' : ''}${dateSafe}</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-base">${SLEEP_EMOJI[entry.sleep] || '—'}</span>
+                <span class="text-[10px] font-semibold text-bark-muted capitalize">${escapeHtml(entry.sleep)}</span>
+                <div class="flex items-center gap-1 no-print ml-1">
+                  <button type="button" data-action="edit-entry" data-entry-id="${entry.id}" class="w-7 h-7 rounded-full bg-white/70 border border-blush/20 flex items-center justify-center active:scale-90 transition-transform" aria-label="Edit entry">
+                    <svg class="w-3.5 h-3.5 text-bark-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                  </button>
+                  <button type="button" data-action="delete-entry" data-entry-id="${entry.id}" class="w-7 h-7 rounded-full bg-white/70 border border-blush/20 flex items-center justify-center active:scale-90 transition-transform" aria-label="Delete entry">
+                    <svg class="w-3.5 h-3.5 text-blush-dark pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 2: score bars -->
+            <div class="space-y-2 mb-3">
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-bold text-bark-muted w-14 flex-shrink-0">BREAKOUT</span>
+                <div class="flex-1 score-bar-track">
+                  <div class="score-bar-fill" style="width:${(b/5)*100}%; background:${bC}"></div>
+                </div>
+                <span class="text-xs font-bold w-4 text-right flex-shrink-0" style="color:${bC}">${b}</span>
+                <span class="text-[10px] text-bark-muted w-16 flex-shrink-0">${BREAKOUT_LABELS[b]}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-bold text-bark-muted w-14 flex-shrink-0">REDNESS</span>
+                <div class="flex-1 score-bar-track" style="background:#dde8db">
+                  <div class="score-bar-fill" style="width:${(r/5)*100}%; background:${rC}"></div>
+                </div>
+                <span class="text-xs font-bold w-4 text-right flex-shrink-0" style="color:${rC}">${r}</span>
+                <span class="text-[10px] text-bark-muted w-16 flex-shrink-0">${REDNESS_LABELS[r]}</span>
+              </div>
+            </div>
+
+            <!-- Row 3: routine pill + notes -->
+            <div class="flex items-start gap-2 flex-wrap">
+              <span class="text-[10px] font-semibold px-2 py-1 rounded-lg" style="background:${routinePct>=80?'#dde8db':'#f2e0de'};color:${routinePct>=80?'#607a5c':'#b5706a'}">
+                ✓ ${routinePct}% routine
+              </span>
+              ${entry.triggers ? `<span class="text-[10px] text-bark-muted flex-1 line-clamp-1">⚡ ${escapeHtml(entry.triggers)}</span>` : ''}
+            </div>
+            ${entry.diet ? `<p class="text-[10px] text-bark-muted mt-1.5 line-clamp-1">🥗 ${escapeHtml(entry.diet)}</p>` : ''}
+
+            ${entry.photo ? `
+            <!-- Phase 5: progress photo thumbnail -->
+            <div class="relative mt-3 photo-thumb-wrap" data-action="view-photo" data-entry-id="${entry.id}">
+              <img src="${entry.photo}"
+                alt="Progress photo ${dateSafe}"
+                class="history-photo"
+                loading="lazy" />
+              <div class="photo-date-badge">📸 ${dateSafe}</div>
+              <div style="position:absolute;top:8px;right:8px;background:rgba(30,20,16,0.5);backdrop-filter:blur(4px);border-radius:99px;padding:3px 8px;display:flex;align-items:center;gap:4px;">
+                <svg style="width:10px;height:10px;color:#fff" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/></svg>
+                <span style="color:#fff;font-size:9px;font-weight:700;letter-spacing:0.04em">VIEW</span>
+              </div>
+            </div>` : ''}
+
+          </div>`;
+        timeline.appendChild(wrap);
+      });
+    }
+
+    /** Delegated click handler for history cards — set up once so it survives
+     *  renderHistory() re-rendering the timeline's children. */
+    document.getElementById('history-timeline')?.addEventListener('click', (e) => {
+      const target = e.target.closest('[data-action]');
+      if (!target) return;
+      const id = target.dataset.entryId;
+      const action = target.dataset.action;
+      if (action === 'view-photo') {
+        const entry = getLogs().find(l => l.id === id);
+        if (entry?.photo) openPhotoLightbox(entry.photo, entry.date);
+      } else if (action === 'edit-entry') {
+        editEntryById(id);
+      } else if (action === 'delete-entry') {
+        confirmDeleteEntry(id);
+      }
+    });
+
+    function confirmDeleteEntry(id) {
+      const entry = getLogs().find(l => l.id === id);
+      if (!entry) return;
+      showConfirmDialog({
+        title: 'Delete this entry?',
+        message: `This permanently removes your entry from <strong>${escapeHtml(entry.date)}</strong>${entry.photo ? ' and its progress photo' : ''}. This can’t be undone.`,
+        confirmLabel: 'Delete',
+        danger: true,
+        onConfirm: () => deleteEntry(id),
+      });
+    }
+
+    function deleteEntry(id) {
+      const logs = getLogs().filter(l => l.id !== id);
+      if (!saveLogs(logs)) return;
+      renderHistory();
+      hydrateDashboard();
+      showToast('Entry deleted', 'info');
+    }
+
+    function buildSparkline(containerId, values, colorArr) {
+      const el  = document.getElementById(containerId);
+      el.innerHTML = '';
+      const max = 5;
+      values.forEach(v => {
+        const bar = document.createElement('div');
+        const pct = (v / max) * 100;
+        bar.style.cssText = `
+          flex:1; border-radius:3px 3px 0 0;
+          height:${pct}%;
+          background:${colorArr[v] || '#d4908a'};
+          opacity:0.85;
+          transition: height 0.5s ease;`;
+        el.appendChild(bar);
+      });
+    }
+
+    /* ══════════════════════════════════════════════
+       EXPORT MODAL  (Phase 4)
+    ══════════════════════════════════════════════ */
+    function openExportModal() {
+      const logs = getLogs();
+      const modal = document.getElementById('export-modal');
+      const body  = document.getElementById('report-body');
+      const meta  = document.getElementById('report-meta');
+
+      if (logs.length === 0) {
+        alert('No entries found. Log at least one skin entry before exporting.');
+        return;
+      }
+
+      /* — computed values — */
+      const bVals    = logs.map(l => parseInt(l.breakout));
+      const rVals    = logs.map(l => parseInt(l.redness));
+      const avgB     = avg(bVals);
+      const avgR     = avg(rVals);
+      const minDate  = logs[logs.length-1]?.date || '—';
+      const maxDate  = logs[0]?.date || '—';
+      const bTrend   = trendArrow([...bVals].reverse());
+      const rTrend   = trendArrow([...rVals].reverse());
+      const sleepMap = {};
+      logs.forEach(l => { sleepMap[l.sleep] = (sleepMap[l.sleep]||0)+1; });
+      const topSleep = Object.entries(sleepMap).sort((a,b)=>b[1]-a[1])[0];
+      const allTriggers = logs.map(l=>l.triggers).filter(Boolean).map(escapeHtml).join('; ');
+      const allDiet     = logs.map(l=>l.diet).filter(Boolean).map(escapeHtml).join('; ');
+      const totalRoutineSteps = logs.reduce((acc,l) => acc + (l.routine?.length||0), 0);
+      const avgRoutinePct = ((totalRoutineSteps / (logs.length * 7)) * 100).toFixed(0);
+
+      /* — severity label helper for report — */
+      function sLabel(v) {
+        const bg  = parseInt(v) <= 2 ? '#dde8db' : parseInt(v) === 3 ? '#fef3c7' : '#f2e0de';
+        const col = parseInt(v) <= 2 ? '#607a5c' : parseInt(v) === 3 ? '#92400e' : '#943f3a';
+        return `<span class="severity-pill" style="background:${bg};color:${col}">${v} – ${BREAKOUT_LABELS[v]||v}</span>`;
+      }
+
+      meta.textContent = `Observation period: ${minDate} – ${maxDate}  ·  ${logs.length} entries  ·  Generated ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}`;
+
+      /* — build report sections — */
+      body.innerHTML = `
+
+        <!-- SECTION 1: Clinical Overview -->
+        <section>
+          <p class="report-section-title">1. Clinical Overview</p>
+          <div style="background:#faf7f4;border-radius:12px;padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;">
+            <div><span style="color:#9e8a80;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">Patient</span><br/><strong>${escapeHtml(userName)}</strong></div>
+            <div><span style="color:#9e8a80;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">Observation Period</span><br/><strong>${minDate} → ${maxDate}</strong></div>
+            <div><span style="color:#9e8a80;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">Total Entries</span><br/><strong>${logs.length} days</strong></div>
+            <div><span style="color:#9e8a80;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">Avg. Routine Adherence</span><br/><strong>${avgRoutinePct}%</strong></div>
+            <div><span style="color:#9e8a80;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">Predominant Sleep Quality</span><br/><strong>${topSleep ? escapeHtml(topSleep[0]) : '—'} (${topSleep ? topSleep[1] : 0} nights)</strong></div>
+            <div><span style="color:#9e8a80;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">Tracking Tool</span><br/><strong>SkinLog v1.0</strong></div>
+          </div>
+        </section>
+
+        <!-- SECTION 2: Severity Summary -->
+        <section>
+          <p class="report-section-title">2. Severity Summary</p>
+          <table class="report-table" style="border:1px solid #f2e0de;border-radius:12px;overflow:hidden;">
+            <thead>
+              <tr>
+                <th>Metric</th><th>Average</th><th>Lowest</th><th>Highest</th><th>Trend</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Breakout Severity</strong></td>
+                <td>${sLabel(Math.round(avgB))}</td>
+                <td>${sLabel(Math.min(...bVals))}</td>
+                <td>${sLabel(Math.max(...bVals))}</td>
+                <td style="color:${bTrend.color};font-weight:700">${bTrend.arrow} ${bTrend.label}</td>
+              </tr>
+              <tr>
+                <td><strong>Redness / Irritation</strong></td>
+                <td>${sLabel(Math.round(avgR))}</td>
+                <td>${sLabel(Math.min(...rVals))}</td>
+                <td>${sLabel(Math.max(...rVals))}</td>
+                <td style="color:${rTrend.color};font-weight:700">${rTrend.arrow} ${rTrend.label}</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- SECTION 3: Diet & Trigger Notes -->
+        <section>
+          <p class="report-section-title">3. Dietary & Lifestyle Notes</p>
+          <div style="background:#faf7f4;border-radius:12px;padding:14px;font-size:12px;color:#3a2e28;line-height:1.7;white-space:pre-wrap;">${allDiet || 'No dietary notes recorded.'}</div>
+        </section>
+
+        <section>
+          <p class="report-section-title">4. Reported Flare-up Triggers</p>
+          <div style="background:#fef2f2;border-radius:12px;padding:14px;font-size:12px;color:#3a2e28;line-height:1.7;white-space:pre-wrap;">${allTriggers || 'No triggers recorded.'}</div>
+        </section>
+
+        <!-- SECTION 4: Chronological Log -->
+        <section>
+          <p class="report-section-title">5. Chronological Entry Log</p>
+          <div style="overflow-x:auto;border-radius:12px;border:1px solid #f2e0de;">
+            <table class="report-table" style="min-width:480px">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Breakout</th>
+                  <th>Redness</th>
+                  <th>Sleep</th>
+                  <th>Routine %</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${logs.map(l => `
+                  <tr>
+                    <td style="white-space:nowrap;font-weight:600">${escapeHtml(l.date)}</td>
+                    <td>${sLabel(l.breakout)}</td>
+                    <td>${sLabel(l.redness)}</td>
+                    <td style="text-transform:capitalize">${SLEEP_EMOJI[l.sleep]||''} ${escapeHtml(l.sleep)}</td>
+                    <td>${Math.round((l.routine?.length||0)/7*100)}%</td>
+                    <td style="font-size:11px;color:#7a6055;max-width:140px">${escapeHtml(l.triggers||l.diet||'—')}</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Disclaimer -->
+        <section style="padding:14px;background:#faf7f4;border-radius:12px;border-left:3px solid #d4908a">
+          <p style="font-size:11px;color:#9e8a80;line-height:1.6;margin:0">
+            <strong style="color:#7a6055">Clinical Disclaimer:</strong>
+            This report is a patient-generated self-assessment log compiled via the SkinLog application.
+            Severity ratings are subjective and self-reported on a scale of 1–5.
+            This document is intended as supplementary context for a qualified dermatologist
+            and does not constitute a medical diagnosis or clinical record.
+          </p>
+        </section>
+
+        <!-- SECTION 6: Visual Progress Gallery -->
+        ${(function(){
+          const photoLogs = [...logs].reverse().filter(l => l.photo);
+          if (photoLogs.length === 0) return `
+            <section>
+              <p class="report-section-title">6. Visual Progress Gallery</p>
+              <div style="background:#faf7f4;border-radius:12px;padding:18px;text-align:center;font-size:12px;color:#9e8a80;">
+                No progress photos were recorded during this observation period.
+              </div>
+            </section>`;
+
+          const cells = photoLogs.map(l => {
+            const bv = parseInt(l.breakout);
+            const rv = parseInt(l.redness);
+            const bBg  = bv <= 2 ? '#dde8db' : bv === 3 ? '#fef3c7' : '#f2e0de';
+            const bCol = bv <= 2 ? '#607a5c' : bv === 3 ? '#92400e' : '#943f3a';
+            const rBg  = rv <= 2 ? '#dde8db' : rv === 3 ? '#fef3c7' : '#f2e0de';
+            const rCol = rv <= 2 ? '#607a5c' : rv === 3 ? '#92400e' : '#943f3a';
+            return `
+              <div style="border-radius:12px;overflow:hidden;border:1px solid #f0e8e6;background:#fff;break-inside:avoid;">
+                <img src="${l.photo}"
+                  alt="Progress photo ${escapeHtml(l.date)}"
+                  style="width:100%;height:120px;object-fit:cover;display:block;border-bottom:1px solid #f0e8e6;" />
+                <div style="padding:8px 10px 10px;">
+                  <div style="font-size:11px;font-weight:700;color:#3a2e28;margin-bottom:5px;">${escapeHtml(l.date)}</div>
+                  <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">
+                    <span style="font-size:9px;font-weight:700;background:${bBg};color:${bCol};padding:2px 7px;border-radius:99px;">
+                      Breakout ${l.breakout}/5
+                    </span>
+                    <span style="font-size:9px;font-weight:700;background:${rBg};color:${rCol};padding:2px 7px;border-radius:99px;">
+                      Redness ${l.redness}/5
+                    </span>
+                    ${l.sleep && l.sleep !== 'not set' ? `<span style="font-size:9px;font-weight:700;background:#eff6ff;color:#1e3a8a;padding:2px 7px;border-radius:99px;text-transform:capitalize;">${SLEEP_EMOJI[l.sleep]||''} ${escapeHtml(l.sleep)}</span>` : ''}
+                  </div>
+                  ${l.triggers ? `<div style="font-size:9px;color:#9e8a80;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">⚡ ${escapeHtml(l.triggers)}</div>` : ''}
+                </div>
+              </div>`;
+          }).join('');
+
+          return `
+            <section style="page-break-before:auto;">
+              <p class="report-section-title">6. Visual Progress Gallery</p>
+              <p style="font-size:11px;color:#9e8a80;margin:0 0 12px;">
+                ${photoLogs.length} progress photo${photoLogs.length > 1 ? 's' : ''} recorded
+                (earliest → most recent). Photos compressed and stored locally via SkinLog.
+              </p>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+                ${cells}
+              </div>
+            </section>`;
+        })()}
+      `;
+
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeExportModal() {
+      document.getElementById('export-modal').classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+
+    function handleModalBackdrop(e) {
+      if (e.target === document.getElementById('export-modal')) closeExportModal();
+    }
+
+    /* ══════════════════════════════════════════════
+       DASHBOARD HYDRATION — reads real localStorage data
+    ══════════════════════════════════════════════ */
+    function hydrateDashboard() {
+      const logs = getLogs();
+      const now  = new Date();
+
+      // ── Date heading ──
+      const dateEl = document.getElementById('dashboard-today-date');
+      if (dateEl) dateEl.textContent = now.toLocaleDateString('en-US',{ weekday:'long', month:'long', day:'numeric' });
+
+      // ── Streak calculation ──
+      let streak = 0;
+      const todayStr = now.toLocaleDateString();
+      // Walk backwards day by day from today
+      for (let i = 0; i < 60; i++) {
+        const d = new Date(now); d.setDate(now.getDate() - i);
+        const ds = d.toLocaleDateString();
+        if (logs.find(l => l.date === ds)) { streak++; } else { break; }
+      }
+
+      const streakNum = document.getElementById('streak-number');
+      const streakRing = document.getElementById('streak-ring');
+      const streakLabel = document.getElementById('streak-label');
+      const streakSub = document.getElementById('streak-subtext');
+      const streakBar = document.getElementById('streak-bar');
+      const streakPct = document.getElementById('streak-pct-label');
+      const dotsWrap = document.getElementById('day-dots');
+
+      if (streakNum) streakNum.textContent = streak;
+      const pct = Math.min(100, Math.round((streak / 20) * 100));
+      if (streakRing) streakRing.style.setProperty('--pct', pct);
+      if (streakBar)  streakBar.style.width = pct + '%';
+      if (streakPct)  streakPct.textContent = pct + '%';
+
+      if (streakLabel) {
+        if (streak === 0) {
+          streakLabel.innerHTML = `Start logging<br/><em class="not-italic font-semibold text-blush">your routine ✦</em>`;
+        } else {
+          streakLabel.innerHTML = `${streak}-day<br/><em class="not-italic font-semibold text-blush">routine streak</em>`;
+        }
+      }
+      if (streakSub) {
+        if (streak === 0)       streakSub.textContent = 'Log your first entry to begin your streak.';
+        else if (streak < 20)   streakSub.textContent = `Keep it up — ${20 - streak} more day${20-streak===1?'':'s'} to your goal!`;
+        else                    streakSub.textContent = `🎉 Goal reached! You're on a ${streak}-day streak!`;
+      }
+
+      // Day dots (show up to 20, mark days that have an entry)
+      if (dotsWrap) {
+        dotsWrap.innerHTML = '';
+        for (let i = 19; i >= 0; i--) {
+          const d = new Date(now); d.setDate(now.getDate() - i);
+          const ds = d.toLocaleDateString();
+          const hasEntry = !!logs.find(l => l.date === ds);
+          const isToday  = i === 0;
+          const dot = document.createElement('div');
+          dot.className = `w-5 h-5 rounded-full flex items-center justify-center transition-transform hover:scale-110 ${
+            isToday && hasEntry ? 'bg-blush ring-2 ring-blush ring-offset-1' :
+            hasEntry            ? 'bg-blush-mid' : 'bg-blush-light'
+          }`;
+          if (hasEntry) dot.innerHTML = `<svg class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`;
+          dotsWrap.appendChild(dot);
+        }
+      }
+
+      // ── Today's skin status ──
+      const todayEntry = logs.find(l => l.date === todayStr);
+      const summaryEl  = document.getElementById('dashboard-today-summary');
+      const badgeEl    = document.getElementById('dashboard-log-badge');
+      const statusEl   = document.getElementById('dashboard-log-status');
+
+      if (todayEntry && summaryEl) {
+        const bv = parseInt(todayEntry.breakout);
+        const rv = parseInt(todayEntry.redness);
+        const bLabel = BREAKOUT_LABELS[bv] || '—';
+        const rLabel = REDNESS_LABELS[rv]  || '—';
+        const routineDone = (todayEntry.routine || []).length;
+        const routinePct  = Math.round((routineDone / 7) * 100);
+
+        if (badgeEl) {
+          badgeEl.innerHTML = `
+            <div class="relative w-2 h-2"><div class="pulse w-2 h-2 rounded-full bg-sage block relative"></div></div>
+            <span class="text-[11px] font-semibold text-sage-dark">Logged today</span>`;
+        }
+
+        summaryEl.innerHTML = `
+          <div class="flex flex-wrap gap-2 mb-3">
+            <span class="chip px-3 py-1.5 rounded-xl text-xs font-semibold text-blush-dark">🔴 Breakout: ${bLabel}</span>
+            <span class="bg-sage-light border border-sage/20 px-3 py-1.5 rounded-xl text-xs font-semibold text-sage-dark">🌡️ Redness: ${rLabel}</span>
+            ${todayEntry.sleep && todayEntry.sleep !== 'not set' ? `<span class="bg-white/70 border border-blush/15 px-3 py-1.5 rounded-xl text-xs font-semibold text-bark-muted">${SLEEP_EMOJI[todayEntry.sleep]} Sleep: ${escapeHtml(todayEntry.sleep)}</span>` : ''}
+          </div>
+          <div class="h-1.5 bg-blush-light rounded-full overflow-hidden mb-1">
+            <div class="h-full rounded-full bg-gradient-to-r from-sage to-sage-dark" style="width:${routinePct}%"></div>
+          </div>
+          <p class="text-[11px] text-bark-muted">${routineDone}/7 routine steps completed (${routinePct}%)</p>
+          ${todayEntry.triggers ? `<p class="text-[11px] text-bark-muted mt-1.5 line-clamp-2">⚡ ${escapeHtml(todayEntry.triggers)}</p>` : ''}`;
+      }
+
+      // ── Quick Insights ──
+      const insightsEl = document.getElementById('dashboard-insights');
+      if (insightsEl && logs.length >= 3) {
+        const bVals = logs.slice(0,7).map(l => parseInt(l.breakout));
+        const rVals = logs.slice(0,7).map(l => parseInt(l.redness));
+        const bTrend = trendArrow(bVals.reverse());
+        const rTrend = trendArrow(rVals.reverse());
+        insightsEl.innerHTML = `
+          <div class="space-y-2">
+            <div class="flex items-start gap-3 p-3 bg-blush-light/40 rounded-2xl">
+              <span class="text-lg mt-0.5">🔴</span>
+              <div><p class="text-sm font-semibold text-bark">Breakout: ${bTrend.label}</p>
+              <p class="text-xs text-bark-muted mt-0.5">7-day avg: ${avg(bVals)}/5 &nbsp;${bTrend.arrow}</p></div>
+            </div>
+            <div class="flex items-start gap-3 p-3 bg-sage-light/40 rounded-2xl">
+              <span class="text-lg mt-0.5">🌡️</span>
+              <div><p class="text-sm font-semibold text-bark">Redness: ${rTrend.label}</p>
+              <p class="text-xs text-bark-muted mt-0.5">7-day avg: ${avg(rVals)}/5 &nbsp;${rTrend.arrow}</p></div>
+            </div>
+          </div>`;
+      } else if (insightsEl && logs.length > 0) {
+        insightsEl.innerHTML = `<p class="text-xs text-bark-muted text-center py-3">Log at least 3 days to unlock trend insights.</p>`;
+      }
+    }
+
+    /* ══════════════════════════════════════════════
+       INIT
+    ══════════════════════════════════════════════ */
+    document.addEventListener('DOMContentLoaded', () => {
+      // Apply stored username to display nodes
+      setUserName(userName);
+
+      // Set log screen date label
+      const now   = new Date();
+      const label = document.getElementById('log-date-label');
+      if (label) label.textContent = now.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+
+      // Init sliders and routine bar to zero
+      updateSlider('breakout', 1);
+      updateSlider('redness',  1);
+      updateRoutineProgress();
+
+      // Hydrate dashboard with real data
+      hydrateDashboard();
+
+      // Show auth wall if not signed in
+      if (!localStorage.getItem('skinlog-authed')) {
+        showAuthScreen();
+      }
+    });
+
+    /* ══════════════════════════════════════════════
+       AUTH SYSTEM
+       — Google Sign-In via Google Identity Services
+       — Apple / Facebook shown with "coming soon" note
+       — Email/name stored locally (no backend needed)
+       — Real OAuth needs a backend; structure is ready
+    ══════════════════════════════════════════════ */
+
+    function showAuthScreen() {
+      var s = document.getElementById('auth-screen');
+      if (!s) return;
+      s.style.display = 'flex';
+      s.style.animation = 'lbFadeIn 0.3s ease both';
+      // Reset to step 1
+      var p = document.getElementById('auth-step-providers');
+      var n = document.getElementById('auth-step-name');
+      if (p) p.style.display = 'block';
+      if (n) n.style.display = 'none';
+      var nf = document.getElementById('auth-name-field');
+      var ef = document.getElementById('auth-email-field');
+      var er = document.getElementById('auth-field-error');
+      if (nf) nf.value = '';
+      if (ef) { ef.value = ''; ef.style.display = 'none'; }
+      if (er) er.style.display = 'none';
+      // Bind input enter-key
+      if (nf && !nf._bound) {
+        nf._bound = true;
+        nf.addEventListener('keydown', function(e) {
+          if (e.key !== 'Enter') return;
+          var emailField = document.getElementById('auth-email-field');
+          if (emailField && emailField.style.display !== 'none') emailField.focus();
+          else completeAuth();
+        });
+        nf.addEventListener('focus', function() { nf.style.borderColor='#d4908a'; nf.style.boxShadow='0 0 0 3px rgba(212,144,138,0.12)'; });
+        nf.addEventListener('blur',  function() { nf.style.borderColor='#f0e8e6'; nf.style.boxShadow='none'; });
+      }
+      if (ef && !ef._bound) {
+        ef._bound = true;
+        ef.addEventListener('keydown', function(e) { if (e.key === 'Enter') completeAuth(); });
+        ef.addEventListener('focus', function() { ef.style.borderColor='#d4908a'; ef.style.boxShadow='0 0 0 3px rgba(212,144,138,0.12)'; });
+        ef.addEventListener('blur',  function() { ef.style.borderColor='#f0e8e6'; ef.style.boxShadow='none'; });
+      }
+    } // end showAuthScreen
+
+    /* ── Auth step helpers — zero native dialogs ── */
+    let _authProvider = '';
+    const PROVIDER_META = {
+      google:   { label:'Google',   bg:'#fff',    border:'#e8e0dd', color:'#3a2e28', icon:'<svg width="16" height="16" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3 12.9 3 4 11.9 4 23s8.9 20 20 20 20-8.9 20-20c0-1.3-.2-2.7-.5-4z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15.1 16.5 19.2 14 24 14c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3c-7.6 0-14.2 4.6-17.7 11.7z"/><path fill="#FBBC05" d="M24 44c5.9 0 11-2 14.7-5.4l-6.8-5.6C29.9 35.1 27.1 36 24 36c-6.1 0-11.2-4.1-13-9.6l-6.9 5.3C7.7 39.6 15.3 44 24 44z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.8c-.9 2.8-2.8 5-5.3 6.5l6.8 5.6C41.6 37 44 30.9 44 24c0-1.3-.2-2.7-.5-4z"/></svg>' },
+      apple:    { label:'Apple',    bg:'#1c1c1e', border:'#1c1c1e', color:'#fff',    icon:'<svg width="14" height="17" viewBox="0 0 814 1000" fill="white"><path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-57.8-155.5-127.4C46 383.8 7.9 280.7 7.9 182.6c0-31.5 6.4-62.4 20.1-91.4 26.7-61.6 90.7-101.8 162.8-101.8 64.9 0 110.3 45.1 147.9 45.1 35.5 0 91.4-47.7 162.8-47.7 26.4 0 108.2 2.6 166.3 80.2zm-244.8-188.2c31.5-37.6 54.5-89.8 54.5-142 0-7.1-.6-14.3-1.9-20.1-51.5 2-113.7 34.4-149.4 73.2-28.9 32.1-55.7 84.3-55.7 137.2 0 7.7 1.3 15.5 1.9 18.1 3.2.6 8.4 1.3 13.6 1.3 46.4 0 105.1-30.9 136.9-67.7z"/></svg>' },
+      facebook: { label:'Facebook', bg:'#1877F2', border:'#1877F2', color:'#fff',    icon:'<svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>' },
+      email:    { label:'Email',    bg:'#faf7f4', border:'#f0e8e6', color:'#3a2e28', icon:'<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#b5706a" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>' },
+    };
+
+    function showNameStep(provider) {
+      _authProvider = provider;
+      const meta = PROVIDER_META[provider];
+
+      document.getElementById('auth-step-providers').style.display = 'none';
+      document.getElementById('auth-step-name').style.display = 'block';
+
+      const badge = document.getElementById('auth-provider-badge');
+      badge.style.background = meta.bg;
+      badge.style.borderColor = meta.border;
+      badge.innerHTML = `${meta.icon}<span style="font-size:13px;font-weight:700;color:${meta.color};">Signing in with ${meta.label}</span>`;
+
+      const emailField = document.getElementById('auth-email-field');
+      emailField.style.display = provider === 'email' ? 'block' : 'none';
+
+      document.getElementById('auth-field-error').style.display = 'none';
+      document.getElementById('auth-name-field').value = '';
+      if (provider === 'email') document.getElementById('auth-email-field').value = '';
+      setTimeout(() => document.getElementById('auth-name-field').focus(), 120);
+    }
+
+    function backToProviders() {
+      document.getElementById('auth-step-name').style.display = 'none';
+      document.getElementById('auth-step-providers').style.display = 'block';
+    }
+
+    function completeAuth() {
+      const name  = (document.getElementById('auth-name-field')?.value || '').trim();
+      const email = (document.getElementById('auth-email-field')?.value || '').trim();
+      const errEl = document.getElementById('auth-field-error');
+      if (!name || (_authProvider === 'email' && !email)) {
+        errEl.style.display = 'block';
+        if (!name) document.getElementById('auth-name-field').focus();
+        else       document.getElementById('auth-email-field').focus();
+        return;
+      }
+      errEl.style.display = 'none';
+      if (email) localStorage.setItem('skinlog-email', email);
+      localStorage.setItem('skinlog-provider', _authProvider);
+      dismissAuthScreen(name);
+    }
+
+    function dismissAuthScreen(name) {
+      setUserName(name);
+      localStorage.setItem('skinlog-authed', '1');
+      hydrateDashboard();
+      var el = document.getElementById('auth-screen');
+      if (el) {
+        el.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        el.style.opacity = '0';
+        setTimeout(function() {
+          el.style.display = 'none';
+          el.style.opacity = '1';
+          el.style.transition = '';
+        }, 320);
+      }
+    }
+
+    /** Avatar tap — inline account popup, no native confirm() */
+    function promptRename() {
+      const existing = document.getElementById('account-popup');
+      if (existing) { existing.remove(); return; }
+
+      const provider = localStorage.getItem('skinlog-provider') || 'email';
+      const meta = PROVIDER_META[provider] || PROVIDER_META.email;
+      const initial = userName ? userName.charAt(0).toUpperCase() : '?';
+
+      const popup = document.createElement('div');
+      popup.id = 'account-popup';
+      popup.style.cssText = `
+        position:fixed;top:72px;right:16px;z-index:400;
+        background:#fff;border-radius:20px;
+        box-shadow:0 8px 32px rgba(58,46,40,0.16);
+        border:1px solid #f0e8e6;width:220px;padding:16px;
+        font-family:'DM Sans',sans-serif;
+        animation:lbFadeIn 0.18s ease both;`;
+      popup.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f0e8e6;">
+          <div style="width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,#f2e0de,#d4908a);display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:#fff;flex-shrink:0;">${escapeHtml(initial)}</div>
+          <div style="overflow:hidden;">
+            <p style="margin:0;font-size:14px;font-weight:700;color:#3a2e28;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(userName)}</p>
+            <p style="margin:0;font-size:11px;color:#9e8a80;">via ${escapeHtml(meta.label)}</p>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f0e8e6;">
+          <button onclick="exportBackup()" style="width:100%;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#7a6055;">
+            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M7 10l5 5 5-5M12 15V3"/></svg>
+            Export Backup
+          </button>
+          <button onclick="triggerRestoreBackup()" style="width:100%;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#7a6055;">
+            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M17 8l-5-5-5 5M12 3v12"/></svg>
+            Restore Backup
+          </button>
+        </div>
+        <button onclick="signOut()" style="width:100%;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#faf7f4;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#943f3a;" >
+          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          Sign out
+        </button>`;
+
+      document.body.appendChild(popup);
+      setTimeout(() => {
+        function dismiss(e) { if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('touchstart',dismiss); document.removeEventListener('click',dismiss); } }
+        document.addEventListener('touchstart', dismiss);
+        document.addEventListener('click', dismiss);
+      }, 50);
+    }
+
+    /* ══════════════════════════════════════════════
+       BACKUP & RESTORE — since entries (incl. photos) live only in this
+       browser's localStorage, this is the only way to move data between
+       devices or survive clearing site data.
+    ══════════════════════════════════════════════ */
+    function exportBackup() {
+      const payload = {
+        app: 'SkinLog',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        username: userName,
+        entries: getLogs(),
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `skinlog-backup-${isoDate(new Date())}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      showToast('Backup downloaded', 'success');
+      document.getElementById('account-popup')?.remove();
+    }
+
+    function triggerRestoreBackup() {
+      document.getElementById('backup-restore-input')?.click();
+    }
+
+    function handleRestoreFile(input) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onerror = () => { showToast('Could not read that file.', 'error'); input.value = ''; };
+      reader.onload = (ev) => {
+        let data;
+        try { data = JSON.parse(ev.target.result); }
+        catch (e) { showToast("That file isn't a valid SkinLog backup.", 'error'); input.value = ''; return; }
+
+        if (!data || !Array.isArray(data.entries)) {
+          showToast("That file isn't a valid SkinLog backup.", 'error');
+          input.value = '';
+          return;
+        }
+
+        const currentCount = getLogs().length;
+        const incomingCount = data.entries.length;
+        showConfirmDialog({
+          title: 'Restore backup?',
+          message: `This replaces your current <strong>${currentCount}</strong> ${currentCount === 1 ? 'entry' : 'entries'} with <strong>${incomingCount}</strong> ${incomingCount === 1 ? 'entry' : 'entries'} from this backup file. This can’t be undone.`,
+          confirmLabel: 'Restore',
+          danger: true,
+          onConfirm: () => {
+            const cleaned = data.entries.map(l => ({
+              id:       l.id || uid(),
+              dateKey:  l.dateKey || isoDate(l.date ? new Date(l.date) : new Date()),
+              date:     l.date || new Date().toLocaleDateString(),
+              breakout: l.breakout ?? '1',
+              redness:  l.redness ?? '1',
+              routine:  Array.isArray(l.routine) ? l.routine : [],
+              diet:     l.diet || '',
+              triggers: l.triggers || '',
+              sleep:    l.sleep || 'not set',
+              photo:    l.photo || null,
+            }));
+            if (!saveLogs(cleaned)) return;
+            if (data.username) setUserName(data.username);
+            renderHistory();
+            hydrateDashboard();
+            showToast('Backup restored', 'success');
+          },
+        });
+        input.value = '';
+      };
+      reader.readAsText(file);
+      document.getElementById('account-popup')?.remove();
+    }
+
+    function signOut() {
+      ['skinlog-authed','skinlog-username','skinlog-email','skinlog-provider'].forEach(k => localStorage.removeItem(k));
+      location.reload();
+    }
+  </script>
+
+  <!-- ════════════════════════════
+       PHOTO LIGHTBOX (Phase 5)
+  ═════════════════════════════ -->
+  <div id="photo-lightbox" class="photo-lightbox hidden" onclick="closePhotoLightbox()">
+    <button class="lightbox-close" onclick="closePhotoLightbox()" aria-label="Close photo">
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    </button>
+    <img id="lightbox-photo-img" src="" alt="Full screen progress photo" class="lightbox-img" onclick="event.stopPropagation()" />
+    <p id="lightbox-caption" class="lightbox-caption"></p>
+    <p style="color:rgba(255,255,255,0.3);font-size:10px;margin-top:6px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase">Tap anywhere to close</p>
+  </div>
+
+  <script>
+    /* ══════════════════════════════════════════════
+       PHASE 5 — LIGHTBOX
+    ══════════════════════════════════════════════ */
+    function openPhotoLightbox(src, dateLabel) {
+      const lb  = document.getElementById('photo-lightbox');
+      const img = document.getElementById('lightbox-photo-img');
+      const cap = document.getElementById('lightbox-caption');
+      img.src         = src;
+      cap.textContent = `Progress photo · ${dateLabel}`;
+      lb.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+    function closePhotoLightbox() {
+      document.getElementById('photo-lightbox').classList.add('hidden');
+      document.getElementById('lightbox-photo-img').src = ''; // free memory
+      document.body.style.overflow = '';
+    }
+    // Also close lightbox / export modal / confirm dialog on Escape key
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        closePhotoLightbox();
+        closeExportModal();
+        const confirmOverlay = document.getElementById('sl-confirm-overlay');
+        if (confirmOverlay) { confirmOverlay.remove(); document.body.style.overflow = ''; }
+      }
+    });
+
+    // Register service worker for offline/installable support (PWA)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+
+</body>
+</html>
