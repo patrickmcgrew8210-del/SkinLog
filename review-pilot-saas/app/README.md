@@ -24,6 +24,9 @@ exactly where to get each value (Supabase project settings, etc.).
 | `NEXT_PUBLIC_SUPABASE_URL` | Browser, server, and proxy Supabase clients |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser, server, and proxy Supabase clients (RLS-restricted) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only admin client (`src/lib/supabase/admin.ts`) — bypasses RLS, never expose to the browser |
+| `STRIPE_SECRET_KEY` | `/api/checkout` and `/api/stripe/webhook` |
+| `STRIPE_WEBHOOK_SECRET` | Verifying Stripe webhook signatures |
+| `STRIPE_PRICE_STARTER` / `_GROWTH` / `_PRO` | Price IDs from Stripe Dashboard products, one per plan |
 
 ## Scripts
 
@@ -57,3 +60,8 @@ exactly where to get each value (Supabase project settings, etc.).
   (service-role, server-only, bypasses RLS — used by webhooks/background jobs).
 - `src/proxy.ts` — refreshes the Supabase session cookie on each request.
 - `src/app/api/health/route.ts` — liveness check used by uptime monitoring.
+- `src/app/api/checkout/route.ts` — creates a Stripe Checkout session (14-day
+  trial) for the signed-in user's business.
+- `src/app/api/stripe/webhook/route.ts` — verifies Stripe webhook signatures
+  and syncs `businesses.plan` on checkout completion, subscription updates,
+  and cancellations.

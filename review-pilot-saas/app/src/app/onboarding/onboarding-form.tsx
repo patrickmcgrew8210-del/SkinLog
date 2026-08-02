@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -14,7 +14,6 @@ const industries = [
 ];
 
 function OnboardingFormInner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const plan = searchParams.get("plan") ?? "growth";
 
@@ -34,15 +33,28 @@ function OnboardingFormInner() {
       p_industry: industry,
     });
 
-    setLoading(false);
-
     if (rpcError) {
+      setLoading(false);
       setError(rpcError.message);
       return;
     }
 
-    router.push(`/dashboard?plan=${plan}`);
-    router.refresh();
+    const checkoutResponse = await fetch("/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plan }),
+    });
+
+    setLoading(false);
+
+    if (!checkoutResponse.ok) {
+      const { error: checkoutError } = await checkoutResponse.json();
+      setError(checkoutError ?? "Could not start checkout. Please try again.");
+      return;
+    }
+
+    const { url } = await checkoutResponse.json();
+    window.location.href = url;
   }
 
   return (
