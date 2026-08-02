@@ -46,16 +46,6 @@ function SignUpForm() {
     setCheckEmail(true);
   }
 
-  async function handleGoogleSignUp() {
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?plan=${plan}`,
-      },
-    });
-  }
-
   if (checkEmail) {
     return (
       <main className="mx-auto flex max-w-sm flex-col gap-4 px-6 py-16 text-center">
@@ -81,20 +71,6 @@ function SignUpForm() {
             change
           </Link>
         </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={handleGoogleSignUp}
-        className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-      >
-        Continue with Google
-      </button>
-
-      <div className="flex items-center gap-3 text-xs uppercase text-slate-400">
-        <span className="h-px flex-1 bg-slate-200" />
-        or
-        <span className="h-px flex-1 bg-slate-200" />
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
