@@ -125,13 +125,13 @@ language sql
 security definer
 set search_path = public
 stable
-as $$
+as '
   select exists (
     select 1 from business_members
     where business_id = target_business_id
       and user_id = auth.uid()
   );
-$$;
+';
 
 create or replace function public.is_business_owner(target_business_id uuid)
 returns boolean
@@ -139,14 +139,14 @@ language sql
 security definer
 set search_path = public
 stable
-as $$
+as '
   select exists (
     select 1 from business_members
     where business_id = target_business_id
       and user_id = auth.uid()
-      and role = 'owner'
+      and role = ''owner''
   );
-$$;
+';
 
 alter table businesses enable row level security;
 alter table business_members enable row level security;
@@ -195,12 +195,12 @@ returns businesses
 language plpgsql
 security definer
 set search_path = public
-as $$
+as '
 declare
   new_business businesses;
 begin
   if auth.uid() is null then
-    raise exception 'must be authenticated to create a business';
+    raise exception ''must be authenticated to create a business'';
   end if;
 
   insert into businesses (name, industry)
@@ -208,11 +208,11 @@ begin
     returning * into new_business;
 
   insert into business_members (business_id, user_id, role)
-    values (new_business.id, auth.uid(), 'owner');
+    values (new_business.id, auth.uid(), ''owner'');
 
   return new_business;
 end;
-$$;
+';
 
 grant execute on function public.create_business(text, text) to authenticated;
 
