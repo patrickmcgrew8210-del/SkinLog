@@ -1,17 +1,29 @@
 # ReviewPilot AI — App
 
-Next.js 14 (App Router) + TypeScript + Tailwind CSS. This is the SaaS
-product's marketing site, dashboard, and API — see `../docs/` for the
+Next.js 16 (App Router) + TypeScript + Tailwind CSS. This is the SaaS
+product's marketing site, auth, dashboard, and API — see `../docs/` for the
 business plan, architecture, and PRD.
 
 ## Local development
 
 ```bash
+cp .env.example .env.local   # fill in real values — see ../GO-LIVE-CHECKLIST.md
 npm install
 npm run dev
 ```
 
 Visit http://localhost:3000. Health check: http://localhost:3000/api/health.
+
+## Environment variables
+
+See `.env.example` for the full list and `../GO-LIVE-CHECKLIST.md` for
+exactly where to get each value (Supabase project settings, etc.).
+
+| Variable | Used by |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Browser, server, and proxy Supabase clients |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser, server, and proxy Supabase clients (RLS-restricted) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only admin client (`src/lib/supabase/admin.ts`) — bypasses RLS, never expose to the browser |
 
 ## Scripts
 
@@ -29,16 +41,19 @@ Visit http://localhost:3000. Health check: http://localhost:3000/api/health.
    not the repo root).
 3. Framework preset: Next.js (auto-detected). Build command and output
    directory: leave as Vercel defaults (`next build`, `.next`).
-4. No environment variables are required yet for this initial scaffold.
-   Later tasks will add `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
-   `ANTHROPIC_API_KEY`, `STRIPE_SECRET_KEY`, etc. — each will be documented
-   in this README as it's introduced.
+4. Add the environment variables listed above in Vercel's Project Settings
+   → Environment Variables, for both Production and Preview.
 5. Deploy. Every push to `main` deploys to production; every PR gets a
    preview deployment automatically.
 
 ## Project layout
 
-- `src/app/` — App Router pages and API routes.
-- `src/app/page.tsx` — placeholder marketing homepage (real copy lands in
-  Phase 5 / Task 20).
+- `src/app/` — App Router pages and API routes (landing, pricing, FAQ,
+  terms, privacy, sign-in/up, onboarding, dashboard).
+- `src/app/dashboard/` — protected area; `layout.tsx` redirects signed-out
+  users to `/sign-in` and users without a business to `/onboarding`.
+- `src/lib/supabase/` — `client.ts` (browser), `server.ts` (Server
+  Components/Route Handlers, cookie-based session), `admin.ts`
+  (service-role, server-only, bypasses RLS — used by webhooks/background jobs).
+- `src/proxy.ts` — refreshes the Supabase session cookie on each request.
 - `src/app/api/health/route.ts` — liveness check used by uptime monitoring.
