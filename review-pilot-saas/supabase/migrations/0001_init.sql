@@ -1,6 +1,6 @@
 -- ReviewPilot AI — initial schema
 -- Multi-tenant model: every business-scoped table is reachable from
--- `businesses` and locked down with row-level security so a bug in
+-- businesses and locked down with row-level security so a bug in
 -- application code cannot leak one business's reviews to another.
 
 create extension if not exists "pgcrypto";
@@ -13,7 +13,7 @@ create table businesses (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   industry text,
-  voice_profile jsonb not null default '{}'::jsonb,
+  voice_profile jsonb not null default jsonb_build_object(),
   stripe_customer_id text unique,
   plan text not null default 'trialing'
     check (plan in ('trialing', 'starter', 'growth', 'pro', 'agency', 'canceled')),
@@ -89,7 +89,7 @@ create table audit_log (
   action text not null,
   entity text not null,
   entity_id uuid,
-  metadata jsonb not null default '{}'::jsonb,
+  metadata jsonb not null default jsonb_build_object(),
   created_at timestamptz not null default now()
 );
 
@@ -98,7 +98,7 @@ create table notifications (
   business_id uuid not null references businesses (id) on delete cascade,
   user_id uuid references auth.users (id),
   type text not null,
-  payload jsonb not null default '{}'::jsonb,
+  payload jsonb not null default jsonb_build_object(),
   read_at timestamptz,
   created_at timestamptz not null default now()
 );
@@ -185,11 +185,11 @@ create policy "user can insert their own owner membership" on business_members
 -- atomically: a business with no business_members row would be permanently
 -- invisible under the RLS policies above (nobody could ever pass
 -- is_business_member for it again), and a client-side
--- insert-then-select on `businesses` alone fails RLS anyway, because the
+-- insert-then-select on businesses alone fails RLS anyway, because the
 -- SELECT-after-INSERT check runs before the follow-up business_members
 -- insert exists. The app should call this function (via
 -- supabase.rpc('create_business', ...)) rather than inserting into
--- `businesses` directly during signup.
+-- businesses directly during signup.
 create or replace function public.create_business(p_name text, p_industry text default null)
 returns businesses
 language plpgsql
