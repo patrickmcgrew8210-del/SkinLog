@@ -1,4 +1,4 @@
--- ReviewPilot AI — initial schema
+-- ReviewPilot AI -- initial schema
 -- Multi-tenant model: every business-scoped table is reachable from
 -- businesses and locked down with row-level security so a bug in
 -- application code cannot leak one business's reviews to another.
@@ -42,7 +42,7 @@ create table locations (
 -- Access/refresh tokens are encrypted application-side (AES-256-GCM, key
 -- held only in server environment variables, never in the database) before
 -- being written here. No client (authenticated role) can read this table
--- at all — see RLS policies below.
+-- at all -- see RLS policies below.
 create table oauth_credentials (
   id uuid primary key default gen_random_uuid(),
   location_id uuid not null references locations (id) on delete cascade,
