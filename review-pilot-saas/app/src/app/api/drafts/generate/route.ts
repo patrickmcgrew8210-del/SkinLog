@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { generateDraftReply } from "@/lib/anthropic";
+import { generateDraftReply } from "@/lib/gemini";
 import { createClient } from "@/lib/supabase/server";
 import { parseVoiceProfile } from "@/lib/voice-profile";
 

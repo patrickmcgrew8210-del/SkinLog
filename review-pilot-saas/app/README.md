@@ -27,7 +27,7 @@ exactly where to get each value (Supabase project settings, etc.).
 | `STRIPE_SECRET_KEY` | `/api/checkout` and `/api/stripe/webhook` |
 | `STRIPE_WEBHOOK_SECRET` | Verifying Stripe webhook signatures |
 | `STRIPE_PRICE_STARTER` / `_GROWTH` / `_PRO` | Price IDs from Stripe Dashboard products, one per plan |
-| `ANTHROPIC_API_KEY` | `/api/drafts/generate` (Claude-powered draft replies) |
+| `GEMINI_API_KEY` | `/api/drafts/generate` (Gemini-powered draft replies, free tier) |
 
 ## Scripts
 
@@ -66,10 +66,10 @@ exactly where to get each value (Supabase project settings, etc.).
 - `src/app/api/stripe/webhook/route.ts` — verifies Stripe webhook signatures
   and syncs `businesses.plan` on checkout completion, subscription updates,
   and cancellations.
-- `src/lib/anthropic.ts` — Claude-powered draft-reply generation, given a
-  review and a business's voice profile. Enforces in code (not just via
-  prompt) that reviews rated 3 stars or below are always flagged for human
-  review.
+- `src/lib/gemini.ts` — Gemini-powered draft-reply generation (free tier,
+  no card required), given a review and a business's voice profile.
+  Enforces in code (not just via prompt) that reviews rated 3 stars or
+  below are always flagged for human review.
 - `src/app/api/drafts/generate/route.ts` + `src/app/dashboard/try-a-draft/`
   — lets a signed-in owner paste in a review and see a live AI-drafted
   reply, using their saved voice profile (`src/app/dashboard/voice-profile/`).
