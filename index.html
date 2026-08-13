@@ -273,14 +273,33 @@
       color: #b5706a;
     }
 
-    /* ── PHASE 7: BREAKOUT AREA MAP ── */
-    .face-map { display: block; }
+    /* ── PHASE 7: BREAKOUT AREA MAP — cute animated mascot face ── */
+    .face-map { display: block; overflow: visible; }
     .face-outline { fill: url(#faceSkinGrad); stroke: rgba(212,144,138,0.4); stroke-width: 2; }
-    .face-feature { fill: none; stroke: rgba(160,125,112,0.4); stroke-width: 2; stroke-linecap: round; }
-    .face-feature-soft { fill: rgba(242,222,212,0.7); stroke: rgba(212,144,138,0.35); stroke-width: 1.5; }
-    .face-feature-fill { fill: rgba(160,125,112,0.5); stroke: none; }
-    .face-feature-pupil { fill: #5a483f; }
-    .face-feature-lips { fill: rgba(212,144,138,0.4); stroke: rgba(180,110,104,0.3); stroke-width: 1; }
+
+    /* Gentle idle bob + sway, forever */
+    @keyframes faceBob {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50%      { transform: translateY(-5px) rotate(-1.2deg); }
+    }
+    .face-bob { transform-box: fill-box; transform-origin: center; animation: faceBob 3.6s ease-in-out infinite; }
+
+    /* Big cute eyes that blink on a loop */
+    .face-eye { fill: #5a483f; }
+    .face-eye-shine { fill: #fff; opacity: 0.9; }
+    @keyframes eyeBlink {
+      0%, 88%, 100% { transform: scaleY(1); }
+      92%           { transform: scaleY(0.12); }
+      96%           { transform: scaleY(1); }
+    }
+    .face-eyes { transform-box: fill-box; transform-origin: center; animation: eyeBlink 4.2s ease-in-out infinite; }
+
+    .face-blush { fill: rgba(212,144,138,0.28); }
+    .face-mouth { fill: none; stroke: #b5706a; stroke-width: 3; stroke-linecap: round; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .face-bob, .face-eyes { animation: none; }
+    }
 
     .face-region {
       fill: rgba(212,144,138,0.09);
@@ -290,26 +309,41 @@
       cursor: pointer;
       transform-box: fill-box;
       transform-origin: center;
-      transition: fill 0.2s ease, stroke 0.2s ease, stroke-dasharray 0.2s ease, transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+      transition: fill 0.2s ease, stroke 0.2s ease, stroke-dasharray 0.2s ease;
     }
     .face-region:hover { fill: rgba(212,144,138,0.16); }
-    .face-region:active { fill: rgba(212,144,138,0.26); transform: scale(0.97); }
+    .face-region:active { fill: rgba(212,144,138,0.26); }
     .face-region.active-region {
       fill: url(#faceActiveGrad);
-      fill-opacity: 0.62;
+      fill-opacity: 0.68;
       stroke: #b5706a;
       stroke-width: 2;
       stroke-dasharray: none;
       filter: url(#regionGlow);
-      animation: regionPop 0.35s cubic-bezier(0.34,1.56,0.64,1) both;
+      animation: regionPop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
     }
     @keyframes regionPop {
-      0%   { transform: scale(0.88); }
-      60%  { transform: scale(1.04); }
-      100% { transform: scale(1); }
+      0%   { transform: scale(0.6) rotate(-6deg); }
+      45%  { transform: scale(1.18) rotate(4deg); }
+      70%  { transform: scale(0.94) rotate(-2deg); }
+      100% { transform: scale(1) rotate(0deg); }
     }
 
-    /* Selected-area chip (below diagram) */
+    /* Confetti burst — spawned by JS on region select */
+    .confetti-bit {
+      pointer-events: none;
+      animation: confettiPop 0.7s cubic-bezier(0.2,0.8,0.3,1) forwards;
+    }
+    @keyframes confettiPop {
+      0%   { transform: translate(0, 0) scale(1);   opacity: 1; }
+      100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .confetti-bit { animation: none; display: none; }
+      .face-region.active-region { animation: none; }
+    }
+
+    /* Selected-area chip (below diagram) — springs in with a little wiggle */
     .area-chip {
       display: inline-flex; align-items: center; gap: 5px;
       font-size: 11px; font-weight: 700;
@@ -317,8 +351,13 @@
       background: linear-gradient(135deg, #f2e0de, #faf7f4);
       border: 1px solid rgba(212,144,138,0.35);
       color: #b5706a;
-      animation: fadeUp 0.3s ease both;
+      animation: chipBounceIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
       transition: transform 0.15s ease;
+    }
+    @keyframes chipBounceIn {
+      0%   { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+      60%  { transform: scale(1.1) rotate(4deg);  opacity: 1; }
+      100% { transform: scale(1) rotate(0deg); }
     }
     .area-chip:active { transform: scale(0.95); }
     .area-chip button {
@@ -908,7 +947,8 @@
                 <stop offset="100%" stop-color="#f2ded4"/>
               </radialGradient>
               <linearGradient id="faceActiveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#e0b4b0"/>
+                <stop offset="0%" stop-color="#f0c4a8"/>
+                <stop offset="50%" stop-color="#e0918a"/>
                 <stop offset="100%" stop-color="#b5706a"/>
               </linearGradient>
               <filter id="faceShadow" x="-30%" y="-30%" width="160%" height="160%">
@@ -919,29 +959,26 @@
               </filter>
             </defs>
 
-            <!-- Base silhouette + minimal features (decorative, non-interactive) -->
-            <path class="face-outline" filter="url(#faceShadow)" pointer-events="none"
-              d="M100 10 C150 10 180 60 180 120 C180 190 145 230 100 230 C55 230 20 190 20 120 C20 60 50 10 100 10 Z"/>
+            <!-- Base silhouette (decorative, non-interactive) — bobs gently -->
+            <g class="face-bob">
+              <path class="face-outline" filter="url(#faceShadow)" pointer-events="none"
+                d="M100 10 C150 10 180 60 180 120 C180 190 145 230 100 230 C55 230 20 190 20 120 C20 60 50 10 100 10 Z"/>
 
-            <!-- Ears -->
-            <path class="face-feature-soft" pointer-events="none" d="M18 108 Q6 118 12 138 Q16 148 24 144 Z"/>
-            <path class="face-feature-soft" pointer-events="none" d="M182 108 Q194 118 188 138 Q184 148 176 144 Z"/>
+              <!-- Cute mascot eyes — blink on a loop -->
+              <g class="face-eyes">
+                <circle class="face-eye" cx="76" cy="96" r="7" pointer-events="none"/>
+                <circle class="face-eye" cx="124" cy="96" r="7" pointer-events="none"/>
+                <circle class="face-eye-shine" cx="78.5" cy="93" r="2.2" pointer-events="none"/>
+                <circle class="face-eye-shine" cx="126.5" cy="93" r="2.2" pointer-events="none"/>
+              </g>
 
-            <!-- Eyebrows -->
-            <path class="face-feature" pointer-events="none" d="M62 82 Q75 75 90 81"/>
-            <path class="face-feature" pointer-events="none" d="M110 81 Q125 75 138 82"/>
+              <!-- Rosy blush -->
+              <ellipse class="face-blush" cx="52" cy="122" rx="10" ry="6" pointer-events="none"/>
+              <ellipse class="face-blush" cx="148" cy="122" rx="10" ry="6" pointer-events="none"/>
 
-            <!-- Eyes -->
-            <path class="face-feature-fill" pointer-events="none" d="M65 95 Q75 88 87 95 Q75 102 65 95 Z"/>
-            <path class="face-feature-fill" pointer-events="none" d="M113 95 Q125 88 135 95 Q125 102 113 95 Z"/>
-            <circle class="face-feature-pupil" cx="76" cy="95.5" r="2.4" pointer-events="none"/>
-            <circle class="face-feature-pupil" cx="124" cy="95.5" r="2.4" pointer-events="none"/>
-
-            <!-- Nose bridge -->
-            <path class="face-feature" pointer-events="none" d="M97 108 Q92 128 96 140 Q100 144 104 140 Q108 128 103 108" opacity="0.5"/>
-
-            <!-- Lips -->
-            <path class="face-feature-lips" pointer-events="none" d="M82 177 Q100 172 118 177 Q100 190 82 177 Z"/>
+              <!-- Happy smile -->
+              <path class="face-mouth" pointer-events="none" d="M78 172 Q100 192 122 172"/>
+            </g>
 
             <!-- Tappable regions -->
             <ellipse class="face-region" data-region="forehead" cx="100" cy="55" rx="55" ry="28" onclick="toggleBreakoutArea(this)"/>
