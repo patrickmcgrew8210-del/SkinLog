@@ -9,6 +9,11 @@ function toggleBreakoutArea(el) {
     .forEach(e => e.classList.toggle('active-region', willActivate));
   renderBreakoutAreaSummary();
 }
+function removeBreakoutArea(region) {
+  document.querySelectorAll(`.face-region[data-region="${region}"]`)
+    .forEach(e => e.classList.remove('active-region'));
+  renderBreakoutAreaSummary();
+}
 function getActiveBreakoutAreas() {
   return [...new Set([...document.querySelectorAll('.face-region.active-region')].map(e => e.dataset.region))];
 }
@@ -21,6 +26,15 @@ function renderBreakoutAreaSummary() {
   const el = document.getElementById('breakout-areas-summary');
   if (!el) return;
   const areas = getActiveBreakoutAreas();
-  el.textContent = areas.length ? areas.map(a => FACE_REGION_LABELS[a]).join(' · ') : 'Tap the diagram to mark areas';
+  if (!areas.length) {
+    el.innerHTML = '<span class="text-[11px] text-bark-muted">Tap the diagram to mark areas</span>';
+    return;
+  }
+  el.innerHTML = areas.map(a => `
+    <span class="area-chip">
+      ${escapeHtml(FACE_REGION_LABELS[a])}
+      <button type="button" onclick="removeBreakoutArea('${a}')" aria-label="Remove ${escapeHtml(FACE_REGION_LABELS[a])}">✕</button>
+    </span>
+  `).join('');
 }
 
