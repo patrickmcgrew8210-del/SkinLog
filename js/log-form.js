@@ -15,8 +15,7 @@ function readCycleDayInput(editingEntry) {
 }
 function toggleCycleTracking() {
   const next = !isCycleTrackingEnabled();
-  if (next) localStorage.setItem('skinlog-cycle-tracking-enabled', '1');
-  else localStorage.removeItem('skinlog-cycle-tracking-enabled');
+  setCycleTrackingEnabled(next);
   const stateEl = document.getElementById('cycle-toggle-state');
   if (stateEl) { stateEl.textContent = next ? 'ON' : 'OFF'; stateEl.style.color = next ? '#607a5c' : '#9e8a80'; }
   syncCycleFieldVisibility();

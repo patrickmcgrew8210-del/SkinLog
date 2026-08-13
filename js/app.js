@@ -2,10 +2,17 @@
    APP INIT — DOMContentLoaded bootstrap, global keydown handler
 ══════════════════════════════════════════════ */
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Apply stored username to display nodes
-  setUserName(userName);
+/** Loads this user's cloud data, sets their display name, and reveals the app. */
+async function _bootSignedInUser(user) {
+  await loadCloudData(user.id);
+  _currentProvider = (user.app_metadata && user.app_metadata.provider) || 'email';
+  const displayName = _cloudCache.display_name
+    || (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name))
+    || (user.email ? user.email.split('@')[0] : 'there');
+  dismissAuthScreen(displayName);
+}
 
+document.addEventListener('DOMContentLoaded', async () => {
   // Set log screen date label
   const now   = new Date();
   const label = document.getElementById('log-date-label');
@@ -17,13 +24,25 @@ document.addEventListener('DOMContentLoaded', () => {
   updateRoutineProgress();
   syncCycleFieldVisibility();
 
-  // Hydrate dashboard with real data
+  // Hydrate dashboard with whatever's in the (still-empty) local cache
+  // so the screen isn't blank while the auth/session check resolves.
   hydrateDashboard();
 
-  // Show auth wall if not signed in
-  if (!localStorage.getItem('skinlog-authed')) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    await _bootSignedInUser(session.user);
+  } else {
     showAuthScreen();
   }
+
+  // Catches the redirect back from Google OAuth (and any other async
+  // sign-in). Guarded so it doesn't re-run for the session already
+  // handled above.
+  sb.auth.onAuthStateChange(async (event, newSession) => {
+    if (event === 'SIGNED_IN' && !_cloudCache && newSession) {
+      await _bootSignedInUser(newSession.user);
+    }
+  });
 });
 
 // Also close lightbox / export modal / products modal / popups / confirm dialog on Escape key

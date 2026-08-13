@@ -335,8 +335,7 @@ function handleRestoreFile(input) {
         if (Array.isArray(data.products)) saveProducts(data.products);
         if (data.currentProducts) saveCurrentProducts(data.currentProducts);
         if (typeof data.cycleTrackingEnabled === 'boolean') {
-          if (data.cycleTrackingEnabled) localStorage.setItem('skinlog-cycle-tracking-enabled', '1');
-          else localStorage.removeItem('skinlog-cycle-tracking-enabled');
+          setCycleTrackingEnabled(data.cycleTrackingEnabled);
           syncCycleFieldVisibility();
         }
         renderHistory();

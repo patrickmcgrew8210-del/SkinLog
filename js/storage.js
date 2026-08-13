@@ -1,12 +1,13 @@
 /* ══════════════════════════════════════════════
-   STORAGE — localStorage read/write primitives (entries, products, settings)
+   STORAGE — reads/writes the cloud-backed cache (see backend.js).
+   Same synchronous shape as before; every other module is unaffected
+   by the move from localStorage to Supabase.
 ══════════════════════════════════════════════ */
 
 /** Reads entries and migrates legacy records (no id / no ISO dateKey) in place. */
 function getLogs() {
-  let arr;
-  try { arr = JSON.parse(localStorage.getItem('skinlog-entries') || '[]'); }
-  catch (e) { arr = []; }
+  if (!_cloudCache) return [];
+  const arr = _cloudCache.entries;
   let migrated = false;
   arr.forEach(l => {
     if (!l.id) { l.id = uid(); migrated = true; }
@@ -22,41 +23,37 @@ function getLogs() {
   if (migrated) saveLogs(arr);
   return arr;
 }
-/** Persists entries; returns false (and toasts) if storage write failed,
- *  e.g. quota exceeded from accumulated photos, so callers can react
- *  instead of silently losing the entry. */
+/** Persists entries to the cloud cache (fire-and-forget sync in the background). */
 function saveLogs(arr) {
-  try {
-    localStorage.setItem('skinlog-entries', JSON.stringify(arr));
-    return true;
-  } catch (e) {
-    showToast('Could not save — device storage is full. Try removing an old photo.', 'error');
-    return false;
-  }
+  if (!_cloudCache) return false;
+  _cloudCache.entries = arr;
+  persistCloudData();
+  return true;
 }
 function getProducts() {
-  try { return JSON.parse(localStorage.getItem('skinlog-products') || '[]'); }
-  catch (e) { return []; }
+  return _cloudCache ? _cloudCache.products : [];
 }
 function saveProducts(arr) {
-  try {
-    localStorage.setItem('skinlog-products', JSON.stringify(arr));
-    return true;
-  } catch (e) {
-    showToast('Could not save — device storage is full.', 'error');
-    return false;
-  }
+  if (!_cloudCache) return false;
+  _cloudCache.products = arr;
+  persistCloudData();
+  return true;
 }
 function getCurrentProducts() {
-  let map;
-  try { map = JSON.parse(localStorage.getItem('skinlog-current-products') || '{}'); }
-  catch (e) { map = {}; }
+  const map = _cloudCache ? _cloudCache.current_products : {};
   return { cleanser: null, treatment: null, moisturizer: null, spf: null, ...map };
 }
 function saveCurrentProducts(map) {
-  try { localStorage.setItem('skinlog-current-products', JSON.stringify(map)); } catch (e) {}
+  if (!_cloudCache) return;
+  _cloudCache.current_products = map;
+  persistCloudData();
 }
 
 function isCycleTrackingEnabled() {
-  return localStorage.getItem('skinlog-cycle-tracking-enabled') === '1';
+  return !!(_cloudCache && _cloudCache.settings.cycleTrackingEnabled);
+}
+function setCycleTrackingEnabled(on) {
+  if (!_cloudCache) return;
+  _cloudCache.settings = { ..._cloudCache.settings, cycleTrackingEnabled: !!on };
+  persistCloudData();
 }
