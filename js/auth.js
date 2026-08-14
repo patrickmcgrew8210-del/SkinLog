@@ -220,6 +220,20 @@ function promptRename() {
         <span style="display:flex;align-items:center;gap:8px;">🩸 Cycle Day Tracking</span>
         <span id="cycle-toggle-state" style="font-size:11px;font-weight:700;color:${isCycleTrackingEnabled() ? '#607a5c' : '#9e8a80'};">${isCycleTrackingEnabled() ? 'ON' : 'OFF'}</span>
       </button>
+      <button id="reminder-toggle-btn" onclick="toggleDailyReminder()" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#7a6055;">
+        <span style="display:flex;align-items:center;gap:8px;">🔔 Daily Reminder</span>
+        <span id="reminder-toggle-state" style="font-size:11px;font-weight:700;color:${getReminderHour() != null ? '#607a5c' : '#9e8a80'};">${formatReminderState()}</span>
+      </button>
+      <div id="reminder-time-picker" style="display:none;gap:6px;">
+        <button onclick="setReminderTime(8)" style="flex:1;padding:8px 4px;border-radius:10px;border:1.5px solid #f2e0de;background:#faf7f4;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;color:#7a6055;">8 AM</button>
+        <button onclick="setReminderTime(14)" style="flex:1;padding:8px 4px;border-radius:10px;border:1.5px solid #f2e0de;background:#faf7f4;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;color:#7a6055;">2 PM</button>
+        <button onclick="setReminderTime(19)" style="flex:1;padding:8px 4px;border-radius:10px;border:1.5px solid #f2e0de;background:#faf7f4;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;color:#7a6055;">7 PM</button>
+        <button onclick="setReminderTime(21)" style="flex:1;padding:8px 4px;border-radius:10px;border:1.5px solid #f2e0de;background:#faf7f4;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;color:#7a6055;">9 PM</button>
+      </div>
+      <button id="biometric-toggle-row" onclick="toggleBiometricLock()" style="display:none;width:100%;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#7a6055;">
+        <span style="display:flex;align-items:center;gap:8px;">🔒 Face ID / Fingerprint Lock</span>
+        <span id="biometric-toggle-state" style="font-size:11px;font-weight:700;color:#9e8a80;">OFF</span>
+      </button>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f0e8e6;">
       <button onclick="exportBackup()" style="width:100%;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#7a6055;">
@@ -246,6 +260,7 @@ function promptRename() {
     </p>`;
 
   document.body.appendChild(popup);
+  refreshBiometricToggleVisibility();
   setTimeout(() => {
     function dismiss(e) { if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('touchstart',dismiss); document.removeEventListener('click',dismiss); } }
     document.addEventListener('touchstart', dismiss);

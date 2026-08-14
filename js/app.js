@@ -2,13 +2,18 @@
    APP INIT — DOMContentLoaded bootstrap, global keydown handler
 ══════════════════════════════════════════════ */
 
-/** Loads this user's cloud data, sets their display name, and reveals the app. */
+/** Loads this user's cloud data, gates on biometric unlock if enabled on
+ *  this device, sets the display name, and reveals the app. */
 async function _bootSignedInUser(user) {
   await loadCloudData(user.id);
   _currentProvider = (user.app_metadata && user.app_metadata.provider) || 'email';
   const displayName = _cloudCache.display_name
     || (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name))
     || (user.email ? user.email.split('@')[0] : 'there');
+
+  if (isBiometricLockEnabled()) {
+    await presentBiometricLockScreen();
+  }
   dismissAuthScreen(displayName);
 }
 
