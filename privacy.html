@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Privacy Policy — SkinLog</title>
+<style>
+  body { font-family: 'DM Sans', -apple-system, sans-serif; background: #faf7f4; color: #3a2e28; max-width: 680px; margin: 0 auto; padding: 40px 24px 80px; line-height: 1.7; }
+  h1 { font-size: 28px; margin-bottom: 4px; }
+  .updated { color: #9e8a80; font-size: 13px; margin-bottom: 32px; }
+  h2 { font-size: 18px; margin-top: 36px; color: #b5706a; }
+  p, li { font-size: 15px; color: #4a3d35; }
+  a { color: #b5706a; }
+  ul { padding-left: 20px; }
+  .note { background: #f2e0de; border-radius: 12px; padding: 16px 20px; font-size: 14px; margin: 24px 0; }
+</style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: [fill in date you publish this]</p>
+
+  <p>SkinLog ("the app") is a personal skin-tracking journal. This page explains what
+  information the app collects, how it's stored, and what control you have over it.</p>
+
+  <h2>What we collect</h2>
+  <p>When you create an account, we collect:</p>
+  <ul>
+    <li>Your name and email address</li>
+    <li>Your password (never stored in readable form — it's hashed by our authentication
+      provider, Supabase, before it ever touches a database)</li>
+  </ul>
+  <p>When you use the app, we store what you choose to log:</p>
+  <ul>
+    <li>Skin condition ratings (breakout severity, redness), affected areas, and routine
+      adherence</li>
+    <li>Free-text notes you write (diet, triggers, etc.)</li>
+    <li>Sleep and, if you enable it, menstrual cycle day tracking</li>
+    <li>Photos you choose to attach to an entry</li>
+    <li>Skincare products you tell the app you're using</li>
+  </ul>
+
+  <div class="note">
+    We don't collect anything beyond what you actively enter. There's no location
+    tracking, no advertising identifiers, and no third-party analytics SDKs in this app.
+  </div>
+
+  <h2>How it's stored</h2>
+  <p>Your data is stored in a cloud database operated by <a href="https://supabase.com" target="_blank" rel="noopener">Supabase</a>,
+  our backend infrastructure provider. Access to your data is restricted at the database
+  level so that only you, authenticated as yourself, can read or write it — not other
+  users, and not us browsing a shared table.</p>
+
+  <h2>How it's used</h2>
+  <p>Your data is used for exactly one purpose: showing it back to you inside the app —
+  your dashboard, history, trends, and the clinician-ready report you can generate from
+  the History screen. We do not sell, rent, or share your data with advertisers or data
+  brokers. We do not use your data to train any model.</p>
+
+  <h2>Your controls</h2>
+  <ul>
+    <li><strong>Export:</strong> the app's Export Backup feature downloads all of your
+      data as a plain JSON file, at any time.</li>
+    <li><strong>Delete individual entries:</strong> any log entry can be edited or
+      deleted from the History screen.</li>
+    <li><strong>Delete your account:</strong> tap your avatar in the top right of the
+      app → Delete Account. This permanently and immediately deletes your account and
+      every entry, photo, and product associated with it. This cannot be undone and we
+      cannot recover it for you afterward.</li>
+  </ul>
+
+  <h2>Children</h2>
+  <p>SkinLog is not directed at children under 13, and we don't knowingly collect
+  information from anyone under that age.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>If this policy changes in a way that affects how your data is handled, we'll update
+  the date at the top of this page.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about your data? Reach out at <a href="mailto:[your contact email]">[your contact email]</a>.</p>
+</body>
+</html>

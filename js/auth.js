@@ -231,10 +231,19 @@ function promptRename() {
         Restore Backup
       </button>
     </div>
-    <button onclick="signOut()" style="width:100%;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#faf7f4;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#943f3a;" >
+    <button onclick="signOut()" style="width:100%;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#faf7f4;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#943f3a;margin-bottom:8px;" >
       <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
       Sign out
-    </button>`;
+    </button>
+    <button onclick="confirmDeleteAccount()" style="width:100%;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:none;background:transparent;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:#c4b0a8;">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/></svg>
+      Delete account
+    </button>
+    <p style="text-align:center;font-size:10px;color:#c4b0a8;margin:10px 0 0;">
+      <a href="privacy.html" target="_blank" rel="noopener" style="color:#c4b0a8;">Privacy</a>
+      &nbsp;·&nbsp;
+      <a href="terms.html" target="_blank" rel="noopener" style="color:#c4b0a8;">Terms</a>
+    </p>`;
 
   document.body.appendChild(popup);
   setTimeout(() => {
@@ -247,4 +256,22 @@ function promptRename() {
 async function signOut() {
   await doCloudSignOut();
   location.reload();
+}
+
+function confirmDeleteAccount() {
+  document.getElementById('account-popup')?.remove();
+  showConfirmDialog({
+    title: 'Delete your account?',
+    message: 'This permanently deletes your account and every entry, photo, and product you\'ve logged. This can\'t be undone.',
+    confirmLabel: 'Delete Everything',
+    danger: true,
+    onConfirm: async () => {
+      const result = await deleteAccount();
+      if (result.error) {
+        showToast('Could not delete your account — please try again.', 'error');
+        return;
+      }
+      location.reload();
+    },
+  });
 }

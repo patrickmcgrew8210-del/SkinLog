@@ -102,3 +102,13 @@ async function doCloudSignOut() {
   _cloudCache = null;
   _cloudUserId = null;
 }
+
+/** Permanently deletes the signed-in user's account and all their data. */
+async function deleteAccount() {
+  const { error } = await sb.rpc('delete_user');
+  if (error) return { error };
+  await sb.auth.signOut();
+  _cloudCache = null;
+  _cloudUserId = null;
+  return {};
+}
