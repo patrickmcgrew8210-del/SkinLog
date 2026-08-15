@@ -36,6 +36,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
     await _bootSignedInUser(session.user);
+  } else if (shouldShowOnboarding()) {
+    showOnboardingScreen();
   } else {
     showAuthScreen();
   }

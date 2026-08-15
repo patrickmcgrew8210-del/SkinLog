@@ -172,6 +172,9 @@ function dismissAuthScreen(name) {
   setUserName(name);
   syncCycleFieldVisibility();
   hydrateDashboard();
+  // Brand-new accounts (any provider) go straight to logging their first
+  // entry instead of landing on an empty dashboard with nothing to show.
+  if (_isNewCloudUser) openLogForToday();
   var el = document.getElementById('auth-screen');
   if (el) {
     el.style.transition = 'opacity 0.3s ease, transform 0.3s ease';

@@ -14,32 +14,59 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let _cloudCache = null;
 let _cloudUserId = null;
 let _persistTimer = null;
+let _isNewCloudUser = false;
+let _loadingUserId = null;
+let _loadPromise = null;
 
 function emptyCloudRow() {
   return { entries: [], products: [], current_products: {}, settings: {}, display_name: '' };
 }
 
-/** Fetches (or creates) the signed-in user's row and populates _cloudCache. */
+/** Fetches (or creates) the signed-in user's row and populates _cloudCache.
+ *  Sets _isNewCloudUser when this is the very first time this account has
+ *  signed in (no row existed yet), regardless of provider.
+ *
+ *  Both a successful sign-up/sign-in AND the app-wide auth-state listener
+ *  (which exists to catch the Google OAuth redirect) can end up calling
+ *  this for the same user around the same time. If a load for this exact
+ *  user is already in flight, piggyback on it instead of racing it —
+ *  otherwise the second call finding the row the first just inserted
+ *  would wrongly clear _isNewCloudUser. */
 async function loadCloudData(userId) {
-  _cloudUserId = userId;
-  const { data, error } = await sb.from('skinlog_data').select('*').eq('user_id', userId).maybeSingle();
-  if (error) {
-    showToast('Could not reach the cloud — showing your last saved data.', 'error');
-    _cloudCache = emptyCloudRow();
-    return;
-  }
-  if (data) {
-    _cloudCache = {
-      entries: data.entries || [],
-      products: data.products || [],
-      current_products: data.current_products || {},
-      settings: data.settings || {},
-      display_name: data.display_name || '',
-    };
-  } else {
-    // First sign-in — create the row.
-    _cloudCache = emptyCloudRow();
-    await sb.from('skinlog_data').insert({ user_id: userId, ...toRow(_cloudCache) });
+  if (_cloudUserId === userId && _cloudCache) return;
+  if (_loadingUserId === userId && _loadPromise) return _loadPromise;
+
+  _loadingUserId = userId;
+  _loadPromise = (async () => {
+    _cloudUserId = userId;
+    _isNewCloudUser = false;
+    const { data, error } = await sb.from('skinlog_data').select('*').eq('user_id', userId).maybeSingle();
+    if (error) {
+      showToast('Could not reach the cloud — showing your last saved data.', 'error');
+      _cloudCache = emptyCloudRow();
+      return;
+    }
+    if (data) {
+      _cloudCache = {
+        entries: data.entries || [],
+        products: data.products || [],
+        current_products: data.current_products || {},
+        settings: data.settings || {},
+        display_name: data.display_name || '',
+      };
+    } else {
+      // First sign-in — create the row.
+      _cloudCache = emptyCloudRow();
+      _isNewCloudUser = true;
+      await sb.from('skinlog_data').insert({ user_id: userId, ...toRow(_cloudCache) });
+    }
+  })();
+
+  try {
+    await _loadPromise;
+  } finally {
+    _loadingUserId = null;
+    _loadPromise = null;
   }
 }
 
