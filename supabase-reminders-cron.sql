@@ -21,7 +21,8 @@ select cron.schedule(
     url := 'https://cmndknueukcaahjyityg.supabase.co/functions/v1/send-reminders',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer sb_publishable_R6TmuNV15ylRuffABmo_Aw_aCL4GE8N'
+      'Authorization', 'Bearer sb_publishable_R6TmuNV15ylRuffABmo_Aw_aCL4GE8N',
+      'apikey', 'sb_publishable_R6TmuNV15ylRuffABmo_Aw_aCL4GE8N'
     ),
     body := '{}'::jsonb
   );
