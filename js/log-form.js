@@ -59,6 +59,63 @@ function setSleep(btn) {
   btn.style.background = s.bg; btn.style.borderColor = s.border; btn.style.color = s.color;
 }
 
+/* ── QUICK CHECK-IN: "Add details" progressive disclosure ── */
+let _logDetailsExpanded = false;
+
+/** Snapshot of which detail categories currently have something filled
+ *  in — used both to decide whether "Add details" should auto-expand
+ *  when editing an entry, and for the toggle's live summary text. */
+function formHasDetailFields() {
+  return {
+    areas:    getActiveBreakoutAreas().length > 0,
+    routine:  document.querySelectorAll('.routine-toggle.active-am,.routine-toggle.active-pm').length > 0,
+    photo:    !document.getElementById('photo-preview-wrap')?.classList.contains('hidden'),
+    diet:     !!document.getElementById('note-diet')?.value.trim(),
+    triggers: !!document.getElementById('note-triggers')?.value.trim(),
+    sleep:    !!document.querySelector('.sleep-btn[style*="background"]'),
+    cycle:    isCycleTrackingEnabled() && !!document.getElementById('cycle-day-input')?.value,
+    products: ['cleanser', 'treatment', 'moisturizer', 'spf'].some(c => _formProducts[c]) || (_formProducts.other || []).length > 0,
+  };
+}
+function countFilledDetails() {
+  return Object.values(formHasDetailFields()).filter(Boolean).length;
+}
+function anyDetailsFilled() {
+  return countFilledDetails() > 0;
+}
+
+/** Updates the "Add details" toggle's sub-label to reflect what's filled
+ *  in — most useful as a reminder once the section is collapsed again. */
+function updateLogDetailsSummary() {
+  const sub = document.getElementById('log-details-toggle-sub');
+  if (!sub) return;
+  const n = countFilledDetails();
+  sub.textContent = n > 0 ? `${n} detail${n === 1 ? '' : 's'} added` : 'Areas, routine, photo, notes & more';
+}
+
+/** Expands/collapses the details disclosure. Uses `inert` (not just
+ *  aria-hidden) so collapsed fields are out of tab order and off-limits
+ *  to screen readers while still letting the CSS grid-rows transition
+ *  animate them smoothly, rather than yanking them out with display:none. */
+function setLogDetailsExpanded(expanded) {
+  const section = document.getElementById('log-details-section');
+  const toggle  = document.getElementById('log-details-toggle');
+  const chevron = document.getElementById('log-details-chevron');
+  const label   = document.getElementById('log-details-toggle-label');
+  if (!section || !toggle) return;
+  _logDetailsExpanded = expanded;
+  section.classList.toggle('expanded', expanded);
+  section.setAttribute('aria-hidden', String(!expanded));
+  if ('inert' in section) section.inert = !expanded;
+  toggle.setAttribute('aria-expanded', String(expanded));
+  if (chevron) chevron.classList.toggle('rotated', expanded);
+  if (label) label.textContent = expanded ? 'Hide details' : 'Add details';
+  updateLogDetailsSummary();
+}
+function toggleLogDetails() {
+  setLogDetailsExpanded(!_logDetailsExpanded);
+}
+
 let _editingEntryId        = null;  // id of the entry being edited, or null for a fresh entry
 /** Clears the whole log form back to a blank entry and exits edit mode. */
 function resetLogForm() {
@@ -94,6 +151,7 @@ function resetLogForm() {
   _formProducts = { ...getCurrentProducts(), other: [] };
   renderAllProductChips();
   renderOtherProductPills();
+  setLogDetailsExpanded(false);
 }
 
 /** Populates the log form's inputs from an existing entry, for editing. */
@@ -138,6 +196,7 @@ function loadEntryIntoForm(entry) {
   _formProducts = { cleanser: null, treatment: null, moisturizer: null, spf: null, ...(entry.products || {}), other: [...(entry.products?.other || [])] };
   renderAllProductChips();
   renderOtherProductPills();
+  setLogDetailsExpanded(anyDetailsFilled());
 }
 
 /** Shows/hides the "you're editing an existing entry" banner on the Log screen. */

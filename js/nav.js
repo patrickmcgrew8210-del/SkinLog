@@ -3,6 +3,8 @@
 ══════════════════════════════════════════════ */
 
 function setNav(viewId, btn) {
+  document.getElementById('log-save-bar')?.classList.toggle('hidden', viewId !== 'log');
+
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active-nav'));
   if (viewId !== 'log') {
     const target = document.querySelector(`[data-view="${viewId}"]`);
