@@ -17,7 +17,7 @@
 </head>
 <body>
   <h1>Privacy Policy</h1>
-  <p class="updated">Last updated: [fill in date you publish this]</p>
+  <p class="updated">Last updated: September 13, 2026</p>
 
   <p>SkinLog ("the app") is a personal skin-tracking journal. This page explains what
   information the app collects, how it's stored, and what control you have over it.</p>
@@ -26,29 +26,56 @@
   <p>When you create an account, we collect:</p>
   <ul>
     <li>Your name and email address</li>
-    <li>Your password (never stored in readable form — it's hashed by our authentication
-      provider, Supabase, before it ever touches a database)</li>
+    <li>If you sign in with Google, the name and email address Google provides during
+      that sign-in</li>
+    <li>If you use email/password sign-in, your password is handled by our
+      authentication provider, Supabase. SkinLog does not have access to your password
+      in readable form.</li>
   </ul>
   <p>When you use the app, we store what you choose to log:</p>
   <ul>
     <li>Skin condition ratings (breakout severity, redness), affected areas, and routine
       adherence</li>
     <li>Free-text notes you write (diet, triggers, etc.)</li>
-    <li>Sleep and, if you enable it, menstrual cycle day tracking</li>
+    <li>Sleep quality and, if you enable it, menstrual cycle day tracking</li>
     <li>Photos you choose to attach to an entry</li>
     <li>Skincare products you tell the app you're using</li>
   </ul>
+  <p>If you turn on daily reminder notifications, we also store a push-notification
+  subscription tied to your browser, plus the reminder hour and time zone you chose —
+  this is what lets us send that one daily reminder, and it's removed if you turn
+  reminders off.</p>
+  <p>If you turn on Face ID/fingerprint app lock, the device credential this creates is
+  stored only in your device's local browser storage. It is never sent to our servers
+  and isn't part of your account data.</p>
 
   <div class="note">
-    We don't collect anything beyond what you actively enter. There's no location
-    tracking, no advertising identifiers, and no third-party analytics SDKs in this app.
+    Based on the current implementation, SkinLog does not intentionally collect location
+    data, advertising identifiers, or use third-party analytics.
   </div>
 
+  <h2>Third-party services we use</h2>
+  <ul>
+    <li><strong>Supabase</strong> — our backend provider. It hosts your account
+      (sign-in) and your logged data.</li>
+    <li><strong>Google</strong> — only if you choose "Continue with Google" to sign in;
+      SkinLog receives your basic profile info from Google for that purpose.</li>
+    <li><strong>Your browser/device's push service</strong> — if you enable daily
+      reminders, the reminder is delivered through your browser or operating system's
+      own notification infrastructure, the same way any website's push notifications
+      work.</li>
+  </ul>
+  <p>We don't use any advertising or analytics services.</p>
+
   <h2>How it's stored</h2>
-  <p>Your data is stored in a cloud database operated by <a href="https://supabase.com" target="_blank" rel="noopener">Supabase</a>,
+  <p>Your data is stored in a database operated by <a href="https://supabase.com" target="_blank" rel="noopener">Supabase</a>,
   our backend infrastructure provider. Access to your data is restricted at the database
   level so that only you, authenticated as yourself, can read or write it — not other
-  users, and not us browsing a shared table.</p>
+  users, and not us browsing a shared table. Connections between the app, Supabase, and
+  your browser are encrypted (HTTPS).</p>
+  <p>SkinLog does not currently apply an automatic deletion or retention schedule. Your
+  logged data remains in your account until you delete individual entries or delete your
+  account.</p>
 
   <h2>How it's used</h2>
   <p>Your data is used for exactly one purpose: showing it back to you inside the app —
@@ -63,9 +90,8 @@
     <li><strong>Delete individual entries:</strong> any log entry can be edited or
       deleted from the History screen.</li>
     <li><strong>Delete your account:</strong> tap your avatar in the top right of the
-      app → Delete Account. This permanently and immediately deletes your account and
-      every entry, photo, and product associated with it. This cannot be undone and we
-      cannot recover it for you afterward.</li>
+      app → Delete Account. This permanently deletes your account and the SkinLog data
+      associated with it. This cannot be undone.</li>
   </ul>
 
   <h2>Children</h2>
@@ -77,6 +103,10 @@
   the date at the top of this page.</p>
 
   <h2>Contact</h2>
-  <p>Questions about your data? Reach out at <a href="mailto:[your contact email]">[your contact email]</a>.</p>
+  <div class="note">
+    Questions about your data? Reach out at
+    <a href="mailto:[INSERT CONTACT EMAIL]">[INSERT CONTACT EMAIL]</a>.
+    <br/><em>(Placeholder — replace with the real support/contact email before publishing.)</em>
+  </div>
 </body>
 </html>
