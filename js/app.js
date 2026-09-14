@@ -11,10 +11,22 @@ async function _bootSignedInUser(user) {
     || (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name))
     || (user.email ? user.email.split('@')[0] : 'there');
 
+  // Captured now, before dismissAuthScreen() (via setUserName) or
+  // anything else gets a chance to call persistCloudData() and
+  // overwrite this user's single outbox slot — see
+  // preparePendingReconciliation()'s own comment for why.
+  const reconciliation = await preparePendingReconciliation(user.id);
+
   if (isBiometricLockEnabled()) {
     await presentBiometricLockScreen();
   }
   dismissAuthScreen(displayName);
+
+  // Runs after the auth/biometric overlays are gone (both sit at a
+  // higher z-index than the confirm-dialog it may show) so a
+  // conflict-risk prompt, if one is needed, is actually visible and
+  // interactive rather than hidden behind them.
+  applyPendingReconciliation(user.id, reconciliation);
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -62,8 +74,7 @@ document.addEventListener('keydown', e => {
     closeAddProductPopup();
     closeCompareModal();
     closeComparePicker();
-    const confirmOverlay = document.getElementById('sl-confirm-overlay');
-    if (confirmOverlay) { confirmOverlay.remove(); document.body.style.overflow = ''; }
+    dismissConfirmDialog();
   }
 });
 
@@ -73,3 +84,9 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
 }
+
+// Retry a queued-but-unsynced write as soon as connectivity returns,
+// instead of waiting for the next unrelated edit to trigger a save.
+window.addEventListener('online', () => {
+  if (_cloudUserId) flushPendingWrite(_cloudUserId);
+});

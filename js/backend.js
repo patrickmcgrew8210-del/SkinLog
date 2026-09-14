@@ -17,6 +17,7 @@ let _persistTimer = null;
 let _isNewCloudUser = false;
 let _loadingUserId = null;
 let _loadPromise = null;
+let _lastServerUpdatedAt = null; // updated_at from the last server row we fetched — see reconcilePendingWriteForUser()
 
 function emptyCloudRow() {
   return { entries: [], products: [], current_products: {}, settings: {}, display_name: '' };
@@ -54,6 +55,7 @@ async function loadCloudData(userId) {
         settings: data.settings || {},
         display_name: data.display_name || '',
       };
+      _lastServerUpdatedAt = data.updated_at || null;
     } else {
       // First sign-in — create the row.
       _cloudCache = emptyCloudRow();
@@ -81,16 +83,115 @@ function toRow(cache) {
   };
 }
 
-/** Debounced upsert of the whole row — callers don't await this. */
+/** Debounced upsert of the whole row — callers don't await this.
+ *
+ *  Every call durably queues the current state to the outbox
+ *  immediately (before the debounce timer, so it survives a tab close
+ *  even within the 400ms window), freezing a single timestamp for that
+ *  snapshot so a retry of the same write is byte-identical rather than
+ *  drifting its own updated_at on every attempt. */
 function persistCloudData() {
   if (!_cloudUserId || !_cloudCache) return;
+  const capturedAt = new Date().toISOString();
+  const payload = { ..._cloudCache };
+  queuePendingWrite(_cloudUserId, payload, capturedAt);
+
   clearTimeout(_persistTimer);
-  _persistTimer = setTimeout(async () => {
-    const { error } = await sb.from('skinlog_data')
-      .update(toRow(_cloudCache))
-      .eq('user_id', _cloudUserId);
-    if (error) showToast('Could not sync to the cloud — check your connection.', 'error');
-  }, 400);
+  _persistTimer = setTimeout(() => flushPendingWrite(_cloudUserId), 400);
+}
+
+/** Sends whatever is currently queued for this user, if anything.
+ *  Shared by the debounce timer above, the online-reconnect retry, and
+ *  boot-time reconciliation below, so there's one write path and one
+ *  place that decides when it's actually safe to clear the outbox.
+ *
+ *  The outbox entry is cleared ONLY on confirmed success, and only if
+ *  it's still the exact entry just sent — a newer edit queued while
+ *  this request was in flight is left untouched rather than wiped out
+ *  by this request's own success landing after the fact. */
+async function flushPendingWrite(userId) {
+  const pending = await getPendingWrite(userId);
+  if (!pending) return;
+  const row = toRow(pending.payload);
+  row.updated_at = pending.capturedAt;
+  const { error } = await sb.from('skinlog_data').update(row).eq('user_id', userId);
+  if (error) {
+    showToast('Could not sync to the cloud — check your connection.', 'error');
+    return; // stays queued; retried on reconnect, next edit, or next boot
+  }
+  await clearPendingWriteIfMatches(userId, pending.capturedAt);
+}
+
+/** Reads and decides — but does not yet act on — any pending offline
+ *  write for this user. Must run before dismissAuthScreen()'s
+ *  setUserName() call, which harmlessly re-saves the display name on
+ *  every sign-in (even when it hasn't changed) and, like any other
+ *  edit, calls persistCloudData() — which would otherwise overwrite
+ *  this user's single outbox slot with that redundant save before this
+ *  function ever gets to look at the real pending entry. Capturing the
+ *  payload here and carrying it through to applyPendingReconciliation()
+ *  makes the decision immune to whatever else queues a write in
+ *  between.
+ *
+ *  This is a conflict-RISK heuristic, not proof of a conflict:
+ *  updated_at is a client-clock timestamp with no server-side
+ *  authority, so it can't fully rule out a genuine multi-device
+ *  conflict — it only distinguishes "nothing else plausibly wrote
+ *  while we were offline" from "something plausibly did." */
+async function preparePendingReconciliation(userId) {
+  const pending = await getPendingWrite(userId);
+  if (!pending) return { type: 'none' };
+  const serverMayBeNewer = !!(_lastServerUpdatedAt && _lastServerUpdatedAt > pending.capturedAt);
+  return { type: serverMayBeNewer ? 'ask' : 'safe', pending };
+}
+
+/** Acts on a decision from preparePendingReconciliation(). Runs after
+ *  the auth/biometric overlays are gone so a conflict-risk prompt (the
+ *  'ask' case) is actually visible and interactive, not hidden behind
+ *  them — see the call site in app.js.
+ *
+ *  - 'safe' (server not newer than the pending write): adopt it into
+ *    _cloudCache (so the UI shows the real unsynced state, not the
+ *    stale server snapshot) and attempt to flush it. Per
+ *    flushPendingWrite() above, the outbox entry is only cleared once
+ *    that attempt actually succeeds.
+ *  - 'ask' (server appears newer): ask, rather than silently pick a
+ *    side. Dismissing/ignoring the prompt (backdrop click, Escape, or
+ *    simply not answering) resolves as "keep the synced version" — an
+ *    unresolved offline edit is a smaller loss than silently
+ *    overwriting data another device may depend on.
+ *
+ *  Both act using the captured payload directly and re-queue it before
+ *  flushing, rather than trusting whatever the outbox slot currently
+ *  holds — it may have since been overwritten by an unrelated
+ *  persistCloudData() call, as above. */
+async function applyPendingReconciliation(userId, reconciliation) {
+  if (!reconciliation || reconciliation.type === 'none') return;
+  const { pending } = reconciliation;
+
+  const adoptAndFlush = async () => {
+    _cloudCache = { ...pending.payload };
+    hydrateDashboard();
+    await queuePendingWrite(userId, pending.payload, pending.capturedAt);
+    flushPendingWrite(userId);
+  };
+
+  if (reconciliation.type === 'safe') {
+    await adoptAndFlush();
+    return;
+  }
+
+  showConfirmDialog({
+    title: 'Unsynced change from last time',
+    message: "We found a change from a previous session that never finished syncing, and this account now has a newer synced version. Keeping the offline change will overwrite that newer version.",
+    confirmLabel: 'Keep offline change',
+    cancelLabel: 'Keep synced version',
+    danger: true,
+    onConfirm: adoptAndFlush,
+    onCancel: () => {
+      clearPendingWrite(userId);
+    },
+  });
 }
 
 /* ── Auth actions ── */

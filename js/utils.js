@@ -51,9 +51,18 @@ function showToast(message, type = 'info') {
 }
 
 /** Generic inline confirm dialog — the app avoids native confirm()/alert(),
- *  so destructive actions (delete entry, restore backup) route through this. */
-function showConfirmDialog({ title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false, onConfirm }) {
+ *  so destructive actions (delete entry, restore backup) route through this.
+ *
+ *  `onCancel` is optional and fires for every dismissal path (Cancel
+ *  button, backdrop click, or Escape via dismissConfirmDialog() below) —
+ *  existing callers that don't pass it keep their original behavior of
+ *  a no-op dismiss. Used where "the user didn't actively confirm" needs
+ *  its own explicit action (e.g. resolving a sync-conflict prompt as
+ *  "keep the safer option" rather than doing nothing). */
+let _activeConfirmOnCancel = null;
+function showConfirmDialog({ title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false, onConfirm, onCancel }) {
   document.getElementById('sl-confirm-overlay')?.remove();
+  _activeConfirmOnCancel = onCancel || null;
   const overlay = document.createElement('div');
   overlay.id = 'sl-confirm-overlay';
   overlay.className = 'modal-overlay';
@@ -70,10 +79,24 @@ function showConfirmDialog({ title, message, confirmLabel = 'Confirm', cancelLab
     </div>`;
   document.body.appendChild(overlay);
   document.body.style.overflow = 'hidden';
-  const close = () => { overlay.remove(); document.body.style.overflow = ''; };
-  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-  document.getElementById('sl-confirm-cancel').onclick = close;
+  const close = () => { overlay.remove(); document.body.style.overflow = ''; _activeConfirmOnCancel = null; };
+  overlay.addEventListener('click', e => { if (e.target === overlay) { close(); onCancel && onCancel(); } });
+  document.getElementById('sl-confirm-cancel').onclick = () => { close(); onCancel && onCancel(); };
   document.getElementById('sl-confirm-ok').onclick = () => { close(); onConfirm && onConfirm(); };
+}
+
+/** Dismisses the active confirm dialog (if any) via its cancel path —
+ *  used by the global Escape-key handler so Escape carries the same
+ *  "don't do the thing" semantics as clicking Cancel, instead of
+ *  silently discarding an onCancel callback the dialog was relying on. */
+function dismissConfirmDialog() {
+  const overlay = document.getElementById('sl-confirm-overlay');
+  if (!overlay) return;
+  const onCancel = _activeConfirmOnCancel;
+  overlay.remove();
+  document.body.style.overflow = '';
+  _activeConfirmOnCancel = null;
+  onCancel && onCancel();
 }
 
 function avg(arr) {
