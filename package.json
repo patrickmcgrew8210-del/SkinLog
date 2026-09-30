@@ -1,8 +1,8 @@
 {
-  "name": "skinlog",
+  "name": "skinfolio",
   "private": true,
   "version": "1.0.0",
-  "description": "SkinLog — a personal dermatology journal (offline-first PWA).",
+  "description": "SkinFolio — a personal dermatology journal (offline-first PWA).",
   "scripts": {
     "build:css": "tailwindcss -c tailwind.config.js -i ./src/tailwind.css -o ./assets/app.css --minify",
     "build:icons": "node scripts/build-icons.mjs",

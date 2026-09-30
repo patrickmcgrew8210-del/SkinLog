@@ -107,7 +107,7 @@ function setAuthMode(mode) {
     if (btn) btn.textContent = 'Sign In';
     if (toggle) toggle.textContent = 'New here? Create an account';
     if (heading) heading.textContent = 'Welcome back';
-    if (sub) sub.textContent = 'Sign in to your SkinLog account.';
+    if (sub) sub.textContent = 'Sign in to your SkinFolio account.';
   }
   if (errEl) errEl.style.display = 'none';
 }

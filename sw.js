@@ -52,7 +52,7 @@ self.addEventListener('fetch', (event) => {
 
 // ── Daily reminder push notifications (sent by the send-reminders Edge Function) ──
 self.addEventListener('push', (event) => {
-  let payload = { title: 'SkinLog', body: "Don't forget to log your skin today ✦" };
+  let payload = { title: 'SkinFolio', body: "Don't forget to log your skin today ✦" };
   try { if (event.data) payload = { ...payload, ...event.data.json() }; } catch (e) {}
 
   event.waitUntil(

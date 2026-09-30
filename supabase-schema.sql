@@ -1,4 +1,4 @@
--- SkinLog cloud schema.
+-- SkinFolio cloud schema.
 -- Run this once in the Supabase dashboard: SQL Editor -> New query -> paste -> Run.
 
 create table if not exists public.skinlog_data (

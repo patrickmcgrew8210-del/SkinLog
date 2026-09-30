@@ -1,4 +1,4 @@
-# Getting SkinLog into the App Store & Play Store
+# Getting SkinFolio into the App Store & Play Store
 
 What's already done in the code, and the exact steps left — all of which
 need your accounts/payment, so they can't be done from here.

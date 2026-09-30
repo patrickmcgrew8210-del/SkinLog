@@ -1,10 +1,10 @@
-# SkinLog — App Store / Play Store listing copy
+# SkinFolio — App Store / Play Store listing copy
 
 Reference copy for App Store Connect and Google Play Console. Edit freely —
 this is a starting draft based on what the app actually does, not filler.
 
 ## App name
-SkinLog
+SkinFolio
 
 ## Subtitle (iOS, 30 chars max)
 Skin Journal & Tracker
@@ -19,7 +19,7 @@ skin tracker,acne log,skincare journal,breakout tracker,dermatology,skin diary,r
 
 Track your skin the way a dermatologist actually wants to see it.
 
-SkinLog is a private, personal journal for your skin — log breakouts,
+SkinFolio is a private, personal journal for your skin — log breakouts,
 redness, and routine adherence in seconds, then watch patterns emerge over
 weeks and months instead of guessing from memory.
 
@@ -50,7 +50,7 @@ backup file whenever you want, and delete your account and all your data
 permanently, right from the app, any time.
 
 No ads. No tracking. No selling your data. It's your skin and your
-information — SkinLog just helps you see it clearly.
+information — SkinFolio just helps you see it clearly.
 
 ## Category
 Primary: Health & Fitness

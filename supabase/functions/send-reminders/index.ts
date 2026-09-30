@@ -1,4 +1,4 @@
-// SkinLog — daily reminder push notifications.
+// SkinFolio — daily reminder push notifications.
 // Runs on a schedule (see supabase-reminders-cron.sql). For every user with
 // an active push subscription whose local time currently matches their
 // chosen reminder hour, and who hasn't logged an entry for today yet,
@@ -65,7 +65,7 @@ Deno.serve(async (_req) => {
     try {
       await webpush.sendNotification(
         subscription,
-        JSON.stringify({ title: "SkinLog", body: "Don't forget to log your skin today ✦" })
+        JSON.stringify({ title: "SkinFolio", body: "Don't forget to log your skin today ✦" })
       );
       await sb.from("skinlog_data").update({ settings: { ...settings, lastReminderSentDate: today } }).eq("user_id", row.user_id);
       sent++;

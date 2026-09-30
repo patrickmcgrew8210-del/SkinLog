@@ -98,7 +98,7 @@ function openExportModal() {
         <div><span style="color:#9e8a80;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">Total Entries</span><br/><strong>${logs.length} days</strong></div>
         <div><span style="color:#9e8a80;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">Avg. Routine Adherence</span><br/><strong>${avgRoutinePct}%</strong></div>
         <div><span style="color:#9e8a80;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">Predominant Sleep Quality</span><br/><strong>${topSleep ? escapeHtml(topSleep[0]) : '—'} (${topSleep ? topSleep[1] : 0} nights)</strong></div>
-        <div><span style="color:#9e8a80;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">Tracking Tool</span><br/><strong>SkinLog v1.0</strong></div>
+        <div><span style="color:#9e8a80;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">Tracking Tool</span><br/><strong>SkinFolio v1.0</strong></div>
       </div>
     </section>
 
@@ -187,7 +187,7 @@ function openExportModal() {
     <section style="padding:14px;background:#faf7f4;border-radius:12px;border-left:3px solid #d4908a">
       <p style="font-size:11px;color:#9e8a80;line-height:1.6;margin:0">
         <strong style="color:#7a6055">Clinical Disclaimer:</strong>
-        This report is a patient-generated self-assessment log compiled via the SkinLog application.
+        This report is a patient-generated self-assessment log compiled via the SkinFolio application.
         Severity ratings are subjective and self-reported on a scale of 1–5.
         This document is intended as supplementary context for a qualified dermatologist
         and does not constitute a medical diagnosis or clinical record.
@@ -238,7 +238,7 @@ function openExportModal() {
           <p class="report-section-title">8. Visual Progress Gallery</p>
           <p style="font-size:11px;color:#9e8a80;margin:0 0 12px;">
             ${photoLogs.length} progress photo${photoLogs.length > 1 ? 's' : ''} recorded
-            (earliest → most recent). Photos compressed and stored locally via SkinLog.
+            (earliest → most recent). Photos compressed and stored locally via SkinFolio.
           </p>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
             ${cells}
@@ -262,7 +262,7 @@ function handleModalBackdrop(e) {
 
 function exportBackup() {
   const payload = {
-    app: 'SkinLog',
+    app: 'SkinFolio',
     version: 1,
     exportedAt: new Date().toISOString(),
     username: userName,
@@ -275,7 +275,7 @@ function exportBackup() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `skinlog-backup-${isoDate(new Date())}.json`;
+  a.download = `skinfolio-backup-${isoDate(new Date())}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -296,10 +296,10 @@ function handleRestoreFile(input) {
   reader.onload = (ev) => {
     let data;
     try { data = JSON.parse(ev.target.result); }
-    catch (e) { showToast("That file isn't a valid SkinLog backup.", 'error'); input.value = ''; return; }
+    catch (e) { showToast("That file isn't a valid SkinFolio backup.", 'error'); input.value = ''; return; }
 
     if (!data || !Array.isArray(data.entries)) {
-      showToast("That file isn't a valid SkinLog backup.", 'error');
+      showToast("That file isn't a valid SkinFolio backup.", 'error');
       input.value = '';
       return;
     }

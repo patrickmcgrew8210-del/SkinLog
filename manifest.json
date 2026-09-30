@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "SkinLog — Skin Journal",
-  "short_name": "SkinLog",
+  "name": "SkinFolio — Skin Journal",
+  "short_name": "SkinFolio",
   "description": "Track breakouts, redness, routine adherence, and triggers, then export a clinician-ready report.",
   "start_url": "./index.html",
   "scope": "./",

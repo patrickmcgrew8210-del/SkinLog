@@ -30,8 +30,8 @@ async function enableBiometricLock() {
     const cred = await navigator.credentials.create({
       publicKey: {
         challenge: randomChallenge(),
-        rp: { name: 'SkinLog' },
-        user: { id: userId, name: userName || 'SkinLog user', displayName: userName || 'SkinLog user' },
+        rp: { name: 'SkinFolio' },
+        user: { id: userId, name: userName || 'SkinFolio user', displayName: userName || 'SkinFolio user' },
         pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
         authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
         timeout: 60000,
