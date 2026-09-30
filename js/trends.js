@@ -38,9 +38,44 @@ function renderTrends() {
   content.classList.remove('hidden');
 
   renderTrendsStats(entries);
+  renderTrendsBaseline(logs, entries, _trendsRange);
   renderTrendsChart(entries);
   renderTrendsHeatmap(logs, _trendsRange);
   renderTrendsInsights(entries);
+}
+
+/** Headline "how am I doing" readout — this range's average vs. the
+ *  user's own average from before it. Answers the progress question
+ *  more directly than the line chart alone: a personal baseline, not a
+ *  population norm, and not shown at all when there isn't a real
+ *  "before" period to compare against or not enough history yet (see
+ *  computeBaselineComparison()'s own gating). */
+function renderTrendsBaseline(logs, entries, range) {
+  const card = document.getElementById('trends-baseline-card');
+  if (!card) return;
+  const cmp = computeBaselineComparison(logs, entries, range);
+  if (cmp.insufficient) { card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+
+  const bDelta = cmp.rangeBreakout - cmp.baselineBreakout;
+  const rDelta = cmp.rangeRedness - cmp.baselineRedness;
+  const verdict = (delta) => Math.abs(delta) < 0.3 ? 'about the same as' : (delta < 0 ? 'lower than' : 'higher than');
+  const headlineDelta = Math.abs(bDelta) >= Math.abs(rDelta) ? bDelta : rDelta;
+  const headline = Math.abs(headlineDelta) < 0.3
+    ? "Holding steady compared to your own history."
+    : headlineDelta < 0
+      ? "Trending toward clearer compared to your own history."
+      : "Trending higher compared to your own history.";
+
+  document.getElementById('trends-baseline-content').innerHTML = `
+    <p class="text-sm font-semibold text-bark mb-2">${headline}</p>
+    <p class="text-xs text-bark-muted leading-relaxed">
+      Breakout this period averaged <strong style="color:#3a2e28">${cmp.rangeBreakout}/5</strong>,
+      ${verdict(bDelta)} your average of <strong style="color:#3a2e28">${cmp.baselineBreakout}/5</strong> before that.
+      Redness averaged <strong style="color:#3a2e28">${cmp.rangeRedness}/5</strong>, ${verdict(rDelta)}
+      <strong style="color:#3a2e28">${cmp.baselineRedness}/5</strong> before.
+    </p>
+    <p class="text-[10px] text-bark-muted mt-2">Based on ${cmp.rangeCount} entries this period vs. ${cmp.baselineCount} before it — your own history, not a general benchmark.</p>`;
 }
 
 function renderTrendsStats(entries) {
@@ -129,37 +164,94 @@ function selectHeatmapCell(dateKey) {
   label.textContent = `${entry.date} — Breakout: ${BREAKOUT_LABELS[parseInt(entry.breakout)]}`;
 }
 
-/** Consolidated "worth noting" digest for the selected range — reuses
- *  computeTopTriggerPatterns / computeProductImpact / computeAreaFrequency
- *  rather than inventing new correlation math for this view. */
+function triggerInsightCard(p) {
+  const isRedness = p.metric === 'redness';
+  return {
+    effectSize: Math.abs(p.delta),
+    html: `
+    <div class="flex items-start gap-3 p-3 bg-white/70 rounded-2xl border border-blush/10">
+      <span class="text-lg mt-0.5">${isRedness ? '🌡️' : '🔍'}</span>
+      <div><p class="text-sm font-semibold text-bark">"${escapeHtml(p.word)}" associated with ${p.delta > 0 ? 'higher' : 'lower'} ${isRedness ? 'redness' : 'breakout'}</p>
+      <p class="text-xs text-bark-muted mt-0.5">You tended to see ${p.withValue}/5 on days you mentioned it, vs ${p.withoutValue}/5 when you didn't &nbsp;·&nbsp; based on ${p.count} mentions</p></div>
+    </div>` };
+}
+
+function productInsightCard(product, impact) {
+  const bDelta = impact.duringBreakout - impact.beforeBreakout;
+  const rDelta = impact.duringRedness - impact.beforeRedness;
+  const leadDelta = Math.abs(bDelta) >= Math.abs(rDelta) ? bDelta : rDelta;
+  return {
+    effectSize: Math.max(Math.abs(bDelta), Math.abs(rDelta)),
+    html: `
+    <div class="flex items-start gap-3 p-3 bg-white/70 rounded-2xl border border-blush/10">
+      <span class="text-lg mt-0.5">🧴</span>
+      <div><p class="text-sm font-semibold text-bark">${escapeHtml(product.name)} associated with ${leadDelta > 0 ? 'higher' : 'lower'} severity</p>
+      <p class="text-xs text-bark-muted mt-0.5">Your data suggests avg breakout ${impact.duringBreakout}/5 while using this (was ${impact.beforeBreakout}/5 before) &nbsp;·&nbsp; avg redness ${impact.duringRedness}/5 (was ${impact.beforeRedness}/5)</p></div>
+    </div>` };
+}
+
+function sleepInsightCard(s) {
+  const direction = s.breakoutDelta < 0 ? 'lower' : 'higher';
+  return {
+    effectSize: Math.max(Math.abs(s.breakoutDelta), Math.abs(s.rednessDelta)),
+    html: `
+    <div class="flex items-start gap-3 p-3 bg-white/70 rounded-2xl border border-blush/10">
+      <span class="text-lg mt-0.5">🌙</span>
+      <div><p class="text-sm font-semibold text-bark">Better sleep nights associated with ${direction} breakout</p>
+      <p class="text-xs text-bark-muted mt-0.5">You tended to see ${s.higherBreakout}/5 breakout on good/great-sleep days vs ${s.lowerBreakout}/5 on poor/fair-sleep days &nbsp;·&nbsp; based on ${s.lowerCount + s.higherCount} entries</p></div>
+    </div>` };
+}
+
+function routineInsightCard(r) {
+  const direction = r.breakoutDelta < 0 ? 'lower' : 'higher';
+  return {
+    effectSize: Math.max(Math.abs(r.breakoutDelta), Math.abs(r.rednessDelta)),
+    html: `
+    <div class="flex items-start gap-3 p-3 bg-white/70 rounded-2xl border border-blush/10">
+      <span class="text-lg mt-0.5">✓</span>
+      <div><p class="text-sm font-semibold text-bark">Higher routine adherence associated with ${direction} breakout</p>
+      <p class="text-xs text-bark-muted mt-0.5">You tended to see ${r.highBreakout}/5 breakout on days you completed 80%+ of your routine, vs ${r.lowerBreakout}/5 on lower-adherence days &nbsp;·&nbsp; based on ${r.highCount + r.lowerCount} entries</p></div>
+    </div>` };
+}
+
+/** Consolidated "worth noting" digest for the selected range. Reuses
+ *  the same compute functions as the Dashboard and My Products rather
+ *  than inventing new correlation math for this view, but — unlike the
+ *  single-card cap those use — pools every qualifying finding across
+ *  categories (trigger words against both metrics, products, sleep,
+ *  routine adherence) and shows the strongest ones by effect size, so a
+ *  real pattern in a less-common category isn't buried by a weaker one
+ *  that happens to be checked first. Capped at MAX_CARDS purely for
+ *  legibility — this is meant to answer "what does this mean for me,"
+ *  not become a dashboard of every technically-qualifying stat. */
 function renderTrendsInsights(entries) {
   const el = document.getElementById('trends-insights');
-  const cards = [];
+  const MAX_CARDS = 6;
+  const candidates = [];
 
-  const triggerPatterns = computeTopTriggerPatterns(entries, 1);
-  triggerPatterns.forEach(p => cards.push(`
-    <div class="flex items-start gap-3 p-3 bg-white/70 rounded-2xl border border-blush/10">
-      <span class="text-lg mt-0.5">🔍</span>
-      <div><p class="text-sm font-semibold text-bark">"${escapeHtml(p.word)}" linked to ${p.delta > 0 ? 'higher' : 'lower'} breakout</p>
-      <p class="text-xs text-bark-muted mt-0.5">Avg ${p.withBreakout}/5 on days mentioned vs ${p.withoutBreakout}/5 when not</p></div>
-    </div>`));
+  computeTopTriggerPatterns(entries, 3, 'breakout').forEach(p => candidates.push(triggerInsightCard(p)));
+  computeTopTriggerPatterns(entries, 2, 'redness').forEach(p => candidates.push(triggerInsightCard(p)));
 
-  const productImpacts = getProducts()
+  getProducts()
     .filter(p => !p.archived)
     .map(p => ({ product: p, impact: computeProductImpact(p) }))
-    .filter(x => !x.impact.insufficient)
-    .sort((a, b) => Math.abs(b.impact.duringBreakout - b.impact.beforeBreakout) - Math.abs(a.impact.duringBreakout - a.impact.beforeBreakout))
-    .slice(0, 1);
-  productImpacts.forEach(({ product, impact }) => {
-    const delta = impact.duringBreakout - impact.beforeBreakout;
-    cards.push(`
-      <div class="flex items-start gap-3 p-3 bg-white/70 rounded-2xl border border-blush/10">
-        <span class="text-lg mt-0.5">🧴</span>
-        <div><p class="text-sm font-semibold text-bark">${escapeHtml(product.name)} linked to ${delta > 0 ? 'higher' : 'lower'} breakout</p>
-        <p class="text-xs text-bark-muted mt-0.5">Avg ${impact.duringBreakout}/5 while using vs ${impact.beforeBreakout}/5 before</p></div>
-      </div>`);
-  });
+    .filter(x => !x.impact.insufficient && (Math.abs(x.impact.duringBreakout - x.impact.beforeBreakout) >= 0.3 || Math.abs(x.impact.duringRedness - x.impact.beforeRedness) >= 0.3))
+    .forEach(({ product, impact }) => candidates.push(productInsightCard(product, impact)));
 
+  const sleepImpact = computeSleepImpact(entries);
+  if (!sleepImpact.insufficient) candidates.push(sleepInsightCard(sleepImpact));
+
+  const routineImpact = computeRoutineAdherenceImpact(entries);
+  if (!routineImpact.insufficient) candidates.push(routineInsightCard(routineImpact));
+
+  const cards = candidates
+    .sort((a, b) => b.effectSize - a.effectSize)
+    .slice(0, MAX_CARDS)
+    .map(c => c.html);
+
+  // Area frequency is descriptive (how often, not a severity comparison),
+  // so it isn't ranked against the correlational cards above — it's
+  // always appended on its own when there's any data for it.
   const areaFreq = computeAreaFrequency(entries).filter(a => a.count > 0).slice(0, 1);
   areaFreq.forEach(a => cards.push(`
     <div class="flex items-start gap-3 p-3 bg-white/70 rounded-2xl border border-blush/10">
@@ -169,7 +261,7 @@ function renderTrendsInsights(entries) {
     </div>`));
 
   el.innerHTML = cards.length ? cards.join('') + `
-    <p class="text-[10px] text-bark-muted text-center italic pt-1">Correlational only — not a diagnosis.</p>` : `
+    <p class="text-[10px] text-bark-muted text-center italic pt-1">Your data suggests these associations — correlational only, not a diagnosis.</p>` : `
     <p class="text-xs text-bark-muted text-center py-3">Keep logging to unlock deeper insights.</p>`;
 }
 

@@ -104,8 +104,14 @@ function avg(arr) {
   return (arr.reduce((a,b) => a+b, 0) / arr.length).toFixed(1);
 }
 
+/** A 2-point split can flip on pure noise, so this requires enough
+ *  points on each side of the halves-split to mean anything — same
+ *  "don't declare a trend from a handful of points" discipline the
+ *  insights.js correlation functions already apply via their own
+ *  minimum-sample gates. */
 function trendArrow(vals) {
-  if (vals.length < 2) return { arrow:'—', color:'#9e8a80', label:'Insufficient data' };
+  const TREND_MIN_SAMPLES = 6;
+  if (vals.length < TREND_MIN_SAMPLES) return { arrow:'—', color:'#9e8a80', label:'Insufficient data' };
   const first = vals.slice(0, Math.ceil(vals.length/2));
   const last  = vals.slice(Math.floor(vals.length/2));
   const delta = avg(last) - avg(first);

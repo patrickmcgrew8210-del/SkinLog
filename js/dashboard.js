@@ -145,8 +145,8 @@ function hydrateDashboard() {
     const patternsHtml = patterns.map(p => `
         <div class="flex items-start gap-3 p-3 bg-white/70 rounded-2xl border border-blush/10">
           <span class="text-lg mt-0.5">🔍</span>
-          <div><p class="text-sm font-semibold text-bark">"${escapeHtml(p.word)}" linked to ${p.delta > 0 ? 'higher' : 'lower'} breakout</p>
-          <p class="text-xs text-bark-muted mt-0.5">Avg ${p.withBreakout}/5 on days mentioned vs ${p.withoutBreakout}/5 when not &nbsp;·&nbsp; ${p.count} entries</p></div>
+          <div><p class="text-sm font-semibold text-bark">"${escapeHtml(p.word)}" associated with ${p.delta > 0 ? 'higher' : 'lower'} breakout</p>
+          <p class="text-xs text-bark-muted mt-0.5">You tended to see ${p.withValue}/5 on days you mentioned it, vs ${p.withoutValue}/5 when you didn't &nbsp;·&nbsp; based on ${p.count} mentions</p></div>
         </div>`).join('');
     insightsEl.innerHTML = `
       <div class="space-y-2">
