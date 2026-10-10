@@ -1,5 +1,9 @@
 -- SkinFolio cloud schema.
 -- Run this once in the Supabase dashboard: SQL Editor -> New query -> paste -> Run.
+-- (A fresh install only needs this file — experiments is already
+-- included below. An existing installation should run
+-- supabase-add-experiments.sql instead, which this table definition
+-- intentionally mirrors.)
 
 create table if not exists public.skinlog_data (
   user_id           uuid primary key references auth.users(id) on delete cascade,
@@ -8,6 +12,7 @@ create table if not exists public.skinlog_data (
   products          jsonb not null default '[]'::jsonb,
   current_products  jsonb not null default '{}'::jsonb,
   settings          jsonb not null default '{}'::jsonb,
+  experiments       jsonb not null default '[]'::jsonb,
   updated_at        timestamptz not null default now()
 );
 
