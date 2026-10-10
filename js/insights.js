@@ -1,5 +1,23 @@
 /* ══════════════════════════════════════════════
    INSIGHTS — cross-cutting correlation/analytics (triggers, areas)
+
+   Known limitations (reviewed, not fixed here — noted so they aren't
+   mistaken for oversights):
+   - Every gate below checks each comparison group's sample size
+     independently (both sides >= some minimum), never their size
+     relative to each other. A 5-entry "before" group compared against
+     a 50-entry "range" group passes the gate just as cleanly as 25 vs
+     25 — the smaller side's average is real but carries more sampling
+     noise than the card's confident wording implies. This mirrors the
+     pre-existing computeProductImpact() convention; fixing it properly
+     (e.g. weighting by group size, or a stricter bar as the imbalance
+     grows) is a real statistics change, not a formatting one.
+   - No outlier handling: one extreme day (e.g. a single breakout:'5'
+     amid a run of '1's) shifts a small group's average the same way a
+     genuine trend would, and nothing here distinguishes "one bad day"
+     from "a real pattern." The minimum-sample gates reduce how often a
+     single outlier can swing a whole comparison, but don't eliminate
+     it, especially right at the MIN_ENTRIES boundary.
 ══════════════════════════════════════════════ */
 
 /** Lowercase, strip punctuation, drop stopwords + very short words. */
@@ -33,9 +51,9 @@ function computeTopTriggerPatterns(logs, limit = 2, metric = 'breakout') {
     const withArr    = tokenized.filter(t => t.words.has(word)).map(t => t.entry);
     const withoutArr = tokenized.filter(t => !t.words.has(word)).map(t => t.entry);
     if (withoutArr.length < MIN_MENTIONS) return;
-    const withVal    = parseFloat(avg(withArr.map(l => parseInt(l[metric]))));
-    const withoutVal = parseFloat(avg(withoutArr.map(l => parseInt(l[metric]))));
-    const delta = withVal - withoutVal;
+    const withVal    = avg(withArr.map(l => parseInt(l[metric])));
+    const withoutVal = avg(withoutArr.map(l => parseInt(l[metric])));
+    const delta = withVal - withoutVal; // avg() returns a numeric string; subtraction coerces it, same as computeProductImpact already relies on
     if (Math.abs(delta) < MIN_DELTA) return;
     candidates.push({ word, count, metric, withValue: withVal, withoutValue: withoutVal, delta });
   });
@@ -57,10 +75,10 @@ function computeSleepImpact(logs) {
   const lower  = logs.filter(l => l.sleep === 'poor' || l.sleep === 'fair');
   const higher = logs.filter(l => l.sleep === 'good' || l.sleep === 'great');
   if (lower.length < MIN_ENTRIES || higher.length < MIN_ENTRIES) return { insufficient: true };
-  const lowerBreakout = parseFloat(avg(lower.map(l => parseInt(l.breakout))));
-  const higherBreakout = parseFloat(avg(higher.map(l => parseInt(l.breakout))));
-  const lowerRedness = parseFloat(avg(lower.map(l => parseInt(l.redness))));
-  const higherRedness = parseFloat(avg(higher.map(l => parseInt(l.redness))));
+  const lowerBreakout = avg(lower.map(l => parseInt(l.breakout)));
+  const higherBreakout = avg(higher.map(l => parseInt(l.breakout)));
+  const lowerRedness = avg(lower.map(l => parseInt(l.redness)));
+  const higherRedness = avg(higher.map(l => parseInt(l.redness)));
   const breakoutDelta = higherBreakout - lowerBreakout;
   const rednessDelta = higherRedness - lowerRedness;
   if (Math.abs(breakoutDelta) < INSIGHT_MIN_DELTA && Math.abs(rednessDelta) < INSIGHT_MIN_DELTA) return { insufficient: true };
@@ -84,10 +102,10 @@ function computeRoutineAdherenceImpact(logs) {
   const high  = logs.filter(l => pctOf(l) >= ADHERENCE_CUTOFF);
   const lower = logs.filter(l => pctOf(l) < ADHERENCE_CUTOFF);
   if (high.length < MIN_ENTRIES || lower.length < MIN_ENTRIES) return { insufficient: true };
-  const highBreakout = parseFloat(avg(high.map(l => parseInt(l.breakout))));
-  const lowerBreakout = parseFloat(avg(lower.map(l => parseInt(l.breakout))));
-  const highRedness = parseFloat(avg(high.map(l => parseInt(l.redness))));
-  const lowerRedness = parseFloat(avg(lower.map(l => parseInt(l.redness))));
+  const highBreakout = avg(high.map(l => parseInt(l.breakout)));
+  const lowerBreakout = avg(lower.map(l => parseInt(l.breakout)));
+  const highRedness = avg(high.map(l => parseInt(l.redness)));
+  const lowerRedness = avg(lower.map(l => parseInt(l.redness)));
   const breakoutDelta = highBreakout - lowerBreakout;
   const rednessDelta = highRedness - lowerRedness;
   if (Math.abs(breakoutDelta) < INSIGHT_MIN_DELTA && Math.abs(rednessDelta) < INSIGHT_MIN_DELTA) return { insufficient: true };
@@ -119,10 +137,10 @@ function computeBaselineComparison(allLogs, rangeEntries, range) {
     insufficient: false,
     rangeCount: rangeEntries.length,
     baselineCount: baseline.length,
-    rangeBreakout: parseFloat(avg(rangeEntries.map(l => parseInt(l.breakout)))),
-    baselineBreakout: parseFloat(avg(baseline.map(l => parseInt(l.breakout)))),
-    rangeRedness: parseFloat(avg(rangeEntries.map(l => parseInt(l.redness)))),
-    baselineRedness: parseFloat(avg(baseline.map(l => parseInt(l.redness)))),
+    rangeBreakout: avg(rangeEntries.map(l => parseInt(l.breakout))),
+    baselineBreakout: avg(baseline.map(l => parseInt(l.breakout))),
+    rangeRedness: avg(rangeEntries.map(l => parseInt(l.redness))),
+    baselineRedness: avg(baseline.map(l => parseInt(l.redness))),
   };
 }
 

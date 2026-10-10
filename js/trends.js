@@ -234,7 +234,7 @@ function renderTrendsInsights(entries) {
 
   getProducts()
     .filter(p => !p.archived)
-    .map(p => ({ product: p, impact: computeProductImpact(p) }))
+    .map(p => ({ product: p, impact: computeProductImpact(p, entries) }))
     .filter(x => !x.impact.insufficient && (Math.abs(x.impact.duringBreakout - x.impact.beforeBreakout) >= 0.3 || Math.abs(x.impact.duringRedness - x.impact.beforeRedness) >= 0.3))
     .forEach(({ product, impact }) => candidates.push(productInsightCard(product, impact)));
 

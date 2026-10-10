@@ -142,27 +142,39 @@ function hydrateDashboard() {
     const bTrend = trendArrow(bVals.reverse());
     const rTrend = trendArrow(rVals.reverse());
     const patterns = computeTopTriggerPatterns(logs);
-    const patternsHtml = patterns.map(p => `
-        <div class="flex items-start gap-3 p-3 bg-white/70 rounded-2xl border border-blush/10">
-          <span class="text-lg mt-0.5">🔍</span>
-          <div><p class="text-sm font-semibold text-bark">"${escapeHtml(p.word)}" associated with ${p.delta > 0 ? 'higher' : 'lower'} breakout</p>
-          <p class="text-xs text-bark-muted mt-0.5">You tended to see ${p.withValue}/5 on days you mentioned it, vs ${p.withoutValue}/5 when you didn't &nbsp;·&nbsp; based on ${p.count} mentions</p></div>
-        </div>`).join('');
-    insightsEl.innerHTML = `
-      <div class="space-y-2">
-        <div class="flex items-start gap-3 p-3 bg-blush-light/40 rounded-2xl">
-          <span class="text-lg mt-0.5">🔴</span>
-          <div><p class="text-sm font-semibold text-bark">Breakout: ${bTrend.label}</p>
-          <p class="text-xs text-bark-muted mt-0.5">7-day avg: ${avg(bVals)}/5 &nbsp;${bTrend.arrow}</p></div>
-        </div>
-        <div class="flex items-start gap-3 p-3 bg-sage-light/40 rounded-2xl">
-          <span class="text-lg mt-0.5">🌡️</span>
-          <div><p class="text-sm font-semibold text-bark">Redness: ${rTrend.label}</p>
-          <p class="text-xs text-bark-muted mt-0.5">7-day avg: ${avg(rVals)}/5 &nbsp;${rTrend.arrow}</p></div>
-        </div>
-        ${patternsHtml}
-        ${patterns.length ? `<p class="text-[10px] text-bark-muted text-center italic pt-1">Based on your own notes — correlational, not a diagnosis.</p>` : ''}
-      </div>`;
+
+    // bTrend/rTrend always share a sample size (same slice length), so
+    // checking one is enough: trendArrow() now needs 6 samples, but this
+    // block's own gate above is still 3 (unchanged — not touching that
+    // threshold here), so 3-5 total entries reaches this branch with
+    // neither a real trend nor any pattern possible (patterns need 6
+    // total too, 3 "with" + 3 "without"). Rather than show two bare
+    // "Insufficient data" rows with no explanation, say why plainly.
+    if (bTrend.label === 'Insufficient data' && patterns.length === 0) {
+      insightsEl.innerHTML = `<p class="text-xs text-bark-muted text-center py-3">Keep logging — trend insights unlock once you have at least 6 days logged.</p>`;
+    } else {
+      const patternsHtml = patterns.map(p => `
+          <div class="flex items-start gap-3 p-3 bg-white/70 rounded-2xl border border-blush/10">
+            <span class="text-lg mt-0.5">🔍</span>
+            <div><p class="text-sm font-semibold text-bark">"${escapeHtml(p.word)}" associated with ${p.delta > 0 ? 'higher' : 'lower'} breakout</p>
+            <p class="text-xs text-bark-muted mt-0.5">You tended to see ${p.withValue}/5 on days you mentioned it, vs ${p.withoutValue}/5 when you didn't &nbsp;·&nbsp; based on ${p.count} mentions</p></div>
+          </div>`).join('');
+      insightsEl.innerHTML = `
+        <div class="space-y-2">
+          <div class="flex items-start gap-3 p-3 bg-blush-light/40 rounded-2xl">
+            <span class="text-lg mt-0.5">🔴</span>
+            <div><p class="text-sm font-semibold text-bark">Breakout: ${bTrend.label}</p>
+            <p class="text-xs text-bark-muted mt-0.5">7-day avg: ${avg(bVals)}/5 &nbsp;${bTrend.arrow}</p></div>
+          </div>
+          <div class="flex items-start gap-3 p-3 bg-sage-light/40 rounded-2xl">
+            <span class="text-lg mt-0.5">🌡️</span>
+            <div><p class="text-sm font-semibold text-bark">Redness: ${rTrend.label}</p>
+            <p class="text-xs text-bark-muted mt-0.5">7-day avg: ${avg(rVals)}/5 &nbsp;${rTrend.arrow}</p></div>
+          </div>
+          ${patternsHtml}
+          ${patterns.length ? `<p class="text-[10px] text-bark-muted text-center italic pt-1">Based on your own notes — correlational, not a diagnosis.</p>` : ''}
+        </div>`;
+    }
   } else if (insightsEl && logs.length > 0) {
     insightsEl.innerHTML = `<p class="text-xs text-bark-muted text-center py-3">Log at least 3 days to unlock trend insights.</p>`;
   }

@@ -13,9 +13,14 @@ function productUsedInEntry(entry, product) {
 /** Correlational (not causal) before/after comparison for a product:
  *  avg severity on days it was used vs. avg severity before its start
  *  date. Requires at least 3 entries on each side to avoid drawing a
- *  conclusion from a couple of noisy data points. */
-function computeProductImpact(product) {
-  const logs = getLogs();
+ *  conclusion from a couple of noisy data points.
+ *
+ *  `logs` defaults to the full history (what the My Products modal
+ *  wants — an all-time view of the product, matching how it's always
+ *  worked). Trends passes its range-filtered entries instead, so a
+ *  product card shown under "Last 7 Days" reflects that window rather
+ *  than silently falling back to all-time data the way it used to. */
+function computeProductImpact(product, logs = getLogs()) {
   const during = logs.filter(l => productUsedInEntry(l, product));
   const before = logs.filter(l => l.dateKey < product.startDate);
   if (during.length < 3 || before.length < 3) return { insufficient: true };
