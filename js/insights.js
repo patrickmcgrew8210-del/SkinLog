@@ -144,6 +144,82 @@ function computeBaselineComparison(allLogs, rangeEntries, range) {
   };
 }
 
+const EXPERIMENT_MIN_ENTRIES = 3;
+
+/** Summarizes one before/during/after period for an experiment: plain
+ *  averages over every entry in the period, with no product/routine
+ *  filtering — an experiment's primary comparison is the date window
+ *  itself, not which days happened to be tagged with the linked
+ *  product. (See computeExperimentImpact()'s own doc comment for why
+ *  that distinction matters.) */
+function summarizeExperimentPeriod(entries) {
+  if (entries.length < EXPERIMENT_MIN_ENTRIES) {
+    return { insufficient: true, count: entries.length, needed: EXPERIMENT_MIN_ENTRIES };
+  }
+  return {
+    insufficient: false,
+    count: entries.length,
+    avgBreakout: avg(entries.map(l => parseInt(l.breakout))),
+    avgRedness: avg(entries.map(l => parseInt(l.redness))),
+  };
+}
+
+/** Before/during/after comparison for one experiment.
+ *
+ *  The primary averages use ALL entries in each period — before is
+ *  everything dated before startDate, during is everything from
+ *  startDate through endDate (or today, if still ongoing), after is
+ *  everything following endDate (only meaningful once the experiment
+ *  has one). None of these are filtered by whether the linked product
+ *  was actually used that day: comparing "every day before" against
+ *  "only the days I remembered to tag the product" would silently bias
+ *  the during period toward whatever kind of day a person tags
+ *  products on, which has nothing to do with the product itself.
+ *
+ *  For a product-linked experiment, `duringProductUsedCount` reports
+ *  separately how many of the during-period entries actually recorded
+ *  using that product — transparency about adherence, not a filter on
+ *  the primary numbers.
+ *
+ *  `after` is `null` (not `{ insufficient: true }`) when the
+ *  experiment has no endDate yet — there's no "after" to speak of for
+ *  an experiment that's still ongoing, which is a different situation
+ *  from "there's an after period but too few entries landed in it." */
+function computeExperimentImpact(experiment, logs, products) {
+  const before = logs.filter(l => l.dateKey < experiment.startDate);
+  const duringUpperBound = experiment.endDate || isoDate(new Date());
+  const during = logs.filter(l => l.dateKey >= experiment.startDate && l.dateKey <= duringUpperBound);
+  const after = experiment.endDate ? logs.filter(l => l.dateKey > experiment.endDate) : null;
+
+  const linkedProduct = experiment.linkedProductId ? products.find(p => p.id === experiment.linkedProductId) : null;
+  const duringProductUsedCount = linkedProduct
+    ? during.filter(l => productUsedInEntry(l, linkedProduct)).length
+    : null;
+
+  return {
+    before: summarizeExperimentPeriod(before),
+    during: summarizeExperimentPeriod(during),
+    after: after === null ? null : summarizeExperimentPeriod(after),
+    duringProductUsedCount,
+  };
+}
+
+/** Other *active* experiments whose date range intersects this one —
+ *  used to show a plain "results may reflect both" warning rather than
+ *  silently presenting a confounded comparison as clean. Archived or
+ *  already-completed/abandoned experiments aren't checked: their
+ *  period is settled, so a live overlap with them isn't actionable the
+ *  way an overlap with another still-running experiment is. */
+function findOverlappingExperiments(experiment, allExperiments) {
+  const today = isoDate(new Date());
+  const expEnd = experiment.endDate || today;
+  return allExperiments.filter(other => {
+    if (other.id === experiment.id || other.archived || other.status !== 'active') return false;
+    const otherEnd = other.endDate || today;
+    return experiment.startDate <= otherEnd && other.startDate <= expEnd;
+  });
+}
+
 /** How often each face region was marked, across a given set of entries,
  *  sorted most- to least-frequent — used by the export report. */
 function computeAreaFrequency(logs) {

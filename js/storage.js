@@ -49,6 +49,16 @@ function saveCurrentProducts(map) {
   persistCloudData();
 }
 
+function getExperiments() {
+  return _cloudCache ? _cloudCache.experiments : [];
+}
+function saveExperiments(arr) {
+  if (!_cloudCache) return false;
+  _cloudCache.experiments = arr;
+  persistCloudData();
+  return true;
+}
+
 function isCycleTrackingEnabled() {
   return !!(_cloudCache && _cloudCache.settings.cycleTrackingEnabled);
 }

@@ -20,7 +20,7 @@ let _loadPromise = null;
 let _lastServerUpdatedAt = null; // updated_at from the last server row we fetched — see reconcilePendingWriteForUser()
 
 function emptyCloudRow() {
-  return { entries: [], products: [], current_products: {}, settings: {}, display_name: '' };
+  return { entries: [], products: [], current_products: {}, settings: {}, experiments: [], display_name: '' };
 }
 
 /** Fetches (or creates) the signed-in user's row and populates _cloudCache.
@@ -53,6 +53,7 @@ async function loadCloudData(userId) {
         products: data.products || [],
         current_products: data.current_products || {},
         settings: data.settings || {},
+        experiments: data.experiments || [], // [] for accounts predating this field or the migration
         display_name: data.display_name || '',
       };
       _lastServerUpdatedAt = data.updated_at || null;
@@ -78,6 +79,7 @@ function toRow(cache) {
     products: cache.products,
     current_products: cache.current_products,
     settings: cache.settings,
+    experiments: cache.experiments,
     display_name: cache.display_name,
     updated_at: new Date().toISOString(),
   };
