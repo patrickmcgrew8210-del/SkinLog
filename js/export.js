@@ -270,6 +270,7 @@ function exportBackup() {
     products: getProducts(),
     currentProducts: getCurrentProducts(),
     cycleTrackingEnabled: isCycleTrackingEnabled(),
+    experiments: getExperiments(),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -329,15 +330,16 @@ function handleRestoreFile(input) {
         }));
         if (!saveLogs(cleaned)) return;
         if (data.username) setUserName(data.username);
-        // Only touch products/cycle setting if the backup actually has
-        // them — an old-format backup predating these features
-        // shouldn't wipe whatever's already tracked/configured.
+        // Only touch products/cycle setting/experiments if the backup
+        // actually has them — an old-format backup predating these
+        // features shouldn't wipe whatever's already tracked/configured.
         if (Array.isArray(data.products)) saveProducts(data.products);
         if (data.currentProducts) saveCurrentProducts(data.currentProducts);
         if (typeof data.cycleTrackingEnabled === 'boolean') {
           setCycleTrackingEnabled(data.cycleTrackingEnabled);
           syncCycleFieldVisibility();
         }
+        if (Array.isArray(data.experiments)) saveExperiments(data.experiments);
         renderHistory();
         hydrateDashboard();
         showToast('Backup restored', 'success');
