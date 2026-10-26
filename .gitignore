@@ -1,1 +1,7 @@
 node_modules/
+
+# Local working files for scripts/check-obf-coverage.mjs — your own real
+# barcode list and the results of running it against them. Not app data,
+# not meant to be shared/committed.
+scripts/obf-coverage-barcodes.txt
+scripts/obf-coverage-results.json

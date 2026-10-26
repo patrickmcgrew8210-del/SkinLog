@@ -1,0 +1,25 @@
+# Open Beauty Facts coverage-check input — SAMPLE FILE.
+#
+# This is a template, not real data. Every line below is a placeholder
+# or an explanation — nothing in this file is sent anywhere as-is.
+#
+# To use it:
+#   1. Copy this file to obf-coverage-barcodes.txt (same folder). That
+#      copy is gitignored, so your real list never gets committed.
+#   2. Read the barcode printed under each product's barcode on the
+#      actual physical packaging you own (usually 8, 12, or 13 digits,
+#      under the black-and-white bars). Put one per line below.
+#   3. Run: node scripts/check-obf-coverage.mjs
+#
+# Rules this file follows, and yours should too:
+#   - One barcode per line, digits only (8-14 digits — EAN-8, UPC-A/EAN-13, or GTIN-14).
+#   - Lines starting with # are ignored (comments).
+#   - Blank lines are ignored.
+#   - Do not type a barcode you haven't actually read off a real product
+#     — a guessed or remembered number isn't a measurement, it's noise.
+
+# ── PLACEHOLDER EXAMPLES (format only — NOT real products, NOT sent to anything) ──
+# 5901234123457   <- PLACEHOLDER: a syntactically valid EAN-13, not a real product
+# 012345678905    <- PLACEHOLDER: a syntactically valid UPC-A, not a real product
+
+# ── Your real barcodes go below this line ──
