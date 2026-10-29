@@ -56,26 +56,41 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "Invalid barcode" }), { status: 400, headers });
   }
 
-  let obfResponse: Response;
+  // Open Beauty Facts (and its sibling Open Food Facts / Open Pet Food
+  // Facts — same underlying engine) is documented and independently
+  // observed to return a JSON body — {"status":0,"status_verbose":
+  // "product not found",...} — on BOTH a 200 and a 404 for a missing
+  // product. A 404 here is not automatically a service failure: it's
+  // this API's documented way of saying "not found" at least some of
+  // the time. (Found and fixed in the coverage script first — see
+  // scripts/check-obf-coverage.mjs and commit f0bb723 — this is the
+  // same fix applied here, since the Edge Function had the identical
+  // bug: checking `!response.ok` before ever reading the body meant a
+  // confirmed not-found delivered via 404 was reported to the client
+  // as a lookup failure instead of "not found.")
+  let obfText: string;
   try {
-    obfResponse = await fetch(
+    const obfResponse = await fetch(
       `https://world.openbeautyfacts.org/api/v2/product/${barcode}.json?fields=${OBF_FIELDS}`,
       { headers: { "User-Agent": USER_AGENT } },
     );
+    obfText = await obfResponse.text();
   } catch {
     return new Response(JSON.stringify({ error: "lookup_failed" }), { status: 502, headers });
   }
 
-  if (!obfResponse.ok) {
+  let data: any = null;
+  try {
+    data = JSON.parse(obfText);
+  } catch {
+    // Not JSON at all — a genuine service problem (an HTML error page,
+    // a malformed response), not a confirmed not-found.
     return new Response(JSON.stringify({ error: "lookup_failed" }), { status: 502, headers });
   }
 
-  const data = await obfResponse.json();
-
-  // status === 1 means Open Beauty Facts has this barcode; 0 means it
-  // genuinely doesn't — that's a real "not found" result, not a server
-  // error, and the client should offer manual search/entry (Stage B),
-  // not show an error state.
+  // status === 1 means Open Beauty Facts has this barcode; 0 (or no
+  // product) means it genuinely doesn't — trust the body's own status
+  // field over whatever HTTP status it arrived on.
   if (data.status !== 1 || !data.product) {
     return new Response(JSON.stringify({ found: false, barcode }), { headers });
   }
