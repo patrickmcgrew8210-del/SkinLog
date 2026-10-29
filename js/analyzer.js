@@ -186,6 +186,7 @@ function selectCatalogProduct(catalogId) {
     ingredients: entry.ingredients.slice(), ingredientsComplete: entry.ingredientsComplete,
     verified: entry.verified, dataSource: entry.dataSource, dataSourceNote: entry.dataSourceNote,
     catalogId: entry.id, barcode: null, catalogNote: entry.note || null,
+    corroboration: entry.corroboration || null, knownIssues: entry.knownIssues || [],
   };
   _analyzerState.editingProductId = null;
   _analyzerState.view = 'detail';
@@ -266,10 +267,10 @@ function renderDetailView() {
           ${result.positives.map(p => `<p class="text-xs text-bark-muted mt-1">• <strong>${escapeHtml(p.ingredient)}</strong> — ${escapeHtml(p.explanation)}</p>`).join('')}</div>` : '';
     const flaggedHtml = result.flagged.length
       ? `<div class="mt-3"><p class="text-[10px] font-bold uppercase tracking-wide text-blush-dark">Flagged for your sensitivities</p>
-          ${result.flagged.map(f => `<p class="text-xs text-bark-muted mt-1">• <strong>${escapeHtml(f.ingredient)}</strong> — ${escapeHtml(f.reason)}</p>`).join('')}</div>` : '';
+          ${result.flagged.map(f => `<p class="text-xs text-bark-muted mt-1">• <strong>${escapeHtml(f.ingredient)}</strong> — ${escapeHtml(f.reason)}${f.affectsScore === false ? ' <em>(already at the maximum penalty for this score)</em>' : ''}</p>`).join('')}</div>` : '';
     const tradeoffsHtml = result.tradeoffs.length
       ? `<div class="mt-3"><p class="text-[10px] font-bold uppercase tracking-wide text-bark-muted">Possible trade-offs</p>
-          ${result.tradeoffs.map(t => `<p class="text-xs text-bark-muted mt-1">• <strong>${escapeHtml(t.ingredient)}</strong> — ${escapeHtml(t.explanation)}</p>`).join('')}</div>` : '';
+          ${result.tradeoffs.map(t => `<p class="text-xs text-bark-muted mt-1">• <strong>${escapeHtml(t.ingredient)}</strong> — ${escapeHtml(t.explanation)}${t.affectsScore === false ? ' <em>(already at the maximum penalty for this score)</em>' : ''}</p>`).join('')}</div>` : '';
     const unknownHtml = result.unknownIngredients.length
       ? `<div class="mt-3"><p class="text-[10px] font-bold uppercase tracking-wide text-bark-muted">Unknown to this app</p>
           <p class="text-xs text-bark-muted mt-1">${escapeHtml(result.unknownIngredients.join(', '))} — not in our reference table, not scored either way.</p></div>` : '';
@@ -305,6 +306,8 @@ function renderDetailView() {
       ${dataQualityBadge(product)}
     </div>
     ${product.catalogNote ? `<p class="text-[11px] text-bark-muted mt-1 italic">${escapeHtml(product.catalogNote)}</p>` : ''}
+    ${product.corroboration ? `<p class="text-[10px] mt-1.5 px-2 py-1 rounded-lg inline-block" style="background:#f0e8e6;color:#7a6055;">Cross-checked against secondary sources ${escapeHtml(product.corroboration.checkedDate)} (${escapeHtml(product.corroboration.confidence)} confidence) — still not independently verified against an official source.</p>` : ''}
+    ${(product.knownIssues || []).length ? product.knownIssues.map(issue => `<p class="text-[11px] mt-1.5 px-2.5 py-1.5 rounded-lg" style="background:#fef3c7;color:#92400e;">⚠ ${escapeHtml(issue)}</p>`).join('') : ''}
     <div class="mt-3">
       <p class="text-[10px] font-bold uppercase tracking-wide text-bark-muted">Ingredients</p>
       ${ingredientsBlock}
@@ -362,6 +365,8 @@ function buildProductRecordFromDraft(draft, existingId) {
     verified: !!draft.verified,
     dataSource: draft.dataSource || 'manual',
     dataSourceNote: draft.dataSourceNote || '',
+    corroboration: draft.corroboration || null,
+    knownIssues: draft.knownIssues || [],
     lastAnalysis: result.insufficient ? null : { score: result.score, confidence: result.confidence, computedAt: new Date().toISOString() },
   };
 }
@@ -421,6 +426,7 @@ function reopenSavedAnalysis(productId) {
     ingredients: product.ingredients || null, ingredientsComplete: !!product.ingredientsComplete,
     verified: !!product.verified, dataSource: product.dataSource || 'manual', dataSourceNote: product.dataSourceNote || '',
     catalogId: product.catalogId || null, barcode: product.barcode || null,
+    corroboration: product.corroboration || null, knownIssues: product.knownIssues || [],
   };
   openAnalyzerModal('detail', { ...draft, __existingProductId: productId });
 }
