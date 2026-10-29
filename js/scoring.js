@@ -12,7 +12,17 @@
       all, this returns `{ insufficient: true }` immediately. No score
       is invented from nothing.
 
-   2. Each ingredient in the product's list is matched against
+   1.5. De-duplication (case-insensitive, first-seen casing kept)
+      happens before anything is scored — this only affects what's
+      SCORED, never what's displayed; the UI still shows the
+      ingredient list exactly as entered or sourced. Without this, the
+      same ingredient listed twice (a copy-paste accident in manual
+      entry, a messy source list) would be scored twice, and a single
+      real ingredient repeated 4 times could reach the same scoring
+      cap as 4 genuinely different ingredients would — found and
+      fixed during a scoring audit, with a regression test.
+
+   2. Each (now-unique) ingredient in the product's list is matched against
       INGREDIENT_RULES (js/ingredient-rules.js) — case-insensitive,
       alias-aware. An ingredient with no entry in that table is tracked
       as "unknown" and never treated as either a positive or a
@@ -91,7 +101,25 @@ const GOAL_TO_ROLES = {
  *         routine-overlap check. Optional; defaults to none.
  */
 function computeCompatibilityScore(product, skinProfile, otherActiveIngredientLists) {
-  const ingredients = Array.isArray(product && product.ingredients) ? product.ingredients : [];
+  const rawIngredients = Array.isArray(product && product.ingredients) ? product.ingredients : [];
+  // De-duplicated (case-insensitive, first-seen casing kept) before any
+  // scoring happens. Without this, the same ingredient listed twice
+  // (a copy-paste accident in manual entry, or a messy source list)
+  // would be scored twice — a single real ingredient repeated 4 times
+  // could reach the same +32 goal-match cap as 4 genuinely different
+  // beneficial ingredients, which is not a meaningful signal about the
+  // product. This only affects what's SCORED, not what's displayed —
+  // the UI still shows the ingredient list exactly as entered/sourced.
+  const seenIngredients = new Set();
+  const ingredients = [];
+  for (const raw of rawIngredients) {
+    const name = String(raw || '').trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seenIngredients.has(key)) continue;
+    seenIngredients.add(key);
+    ingredients.push(name);
+  }
   otherActiveIngredientLists = otherActiveIngredientLists || [];
   const profile = skinProfile || { goals: [], sensitivities: [], skinType: null };
   const sensitivities = (profile.sensitivities || []).map(s => s.trim().toLowerCase()).filter(Boolean);
@@ -123,12 +151,18 @@ function computeCompatibilityScore(product, skinProfile, otherActiveIngredientLi
     // or not this ingredient has a rules-table entry at all.
     const sensitivityHit = sensitivities.find(s => lower === s || lower.includes(s) || s.includes(lower));
     if (sensitivityHit) {
-      flagged.push({ ingredient: name, reason: `Matches your stated sensitivity/avoid entry: "${sensitivityHit}"` });
+      let applied = 0;
       if (sensitivityPointsUsed < SCORE_SENSITIVITY_CAP) {
-        const applied = Math.min(SCORE_SENSITIVITY_PENALTY, SCORE_SENSITIVITY_CAP - sensitivityPointsUsed);
+        applied = Math.min(SCORE_SENSITIVITY_PENALTY, SCORE_SENSITIVITY_CAP - sensitivityPointsUsed);
         score -= applied;
         sensitivityPointsUsed += applied;
       }
+      // affectsScore mirrors the tradeoffs entries below: once the
+      // sensitivity penalty cap is reached, a further match is still
+      // worth showing the user (it's still their ingredient, still
+      // worth knowing about) but shouldn't be implied to have moved
+      // the number any further than it already did.
+      flagged.push({ ingredient: name, reason: `Matches your stated sensitivity/avoid entry: "${sensitivityHit}"`, affectsScore: applied > 0 });
       continue; // a sensitivity hit supersedes the general rule-table read for this ingredient
     }
 

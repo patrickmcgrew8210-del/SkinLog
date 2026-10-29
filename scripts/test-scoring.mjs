@@ -132,5 +132,32 @@ const emptyProfile = { goals: [], sensitivities: [], skinType: null };
     r.score === 50 + 32, JSON.stringify({ score: r.score, positivesCount: r.positives.length }));
 }
 
+// 13. Duplicate-ingredient bug fix: a single real ingredient listed
+// multiple times must NOT score the same as several genuinely
+// different ones. Found during a scoring audit — this is a
+// regression test for a real, confirmed bug, not a hypothetical.
+{
+  const dup = computeCompatibilityScore({ ingredients: ['Niacinamide', 'Niacinamide', 'Niacinamide', 'Niacinamide'], ingredientsComplete: true, verified: true }, { goals: ['barrier_repair'], sensitivities: [], skinType: null });
+  const single = computeCompatibilityScore({ ingredients: ['Niacinamide'], ingredientsComplete: true, verified: true }, { goals: ['barrier_repair'], sensitivities: [], skinType: null });
+  record('A single ingredient listed 4 times scores identically to listing it once — duplicates no longer inflate the score',
+    dup.score === single.score && dup.positives.length === 1,
+    JSON.stringify({ duplicateListedScore: dup.score, singleListingScore: single.score, positivesFromDuplicateList: dup.positives.length }));
+}
+
+// 14. flagged entries honestly report whether they actually moved the
+// score, once the sensitivity penalty cap is reached — matching the
+// same affectsScore pattern tradeoffs already had, so the UI's
+// explanation never implies a flagged ingredient changed the number
+// when the cap already maxed out the penalty.
+{
+  const profile = { goals: [], sensitivities: ['fragrance', 'essential oil', 'limonene', 'linalool'], skinType: null }; // 4 distinct sensitivities, cap is -75 at -25 each = 3 before the cap is hit
+  const r = computeCompatibilityScore({ ingredients: ['Fragrance', 'Essential Oil', 'Limonene', 'Linalool'], ingredientsComplete: true, verified: true }, profile);
+  const affectingCount = r.flagged.filter(f => f.affectsScore).length;
+  const notAffectingCount = r.flagged.filter(f => f.affectsScore === false).length;
+  record('Once the sensitivity penalty cap is reached, further flagged matches are explicitly marked as not having moved the score further',
+    r.flagged.length === 4 && affectingCount === 3 && notAffectingCount === 1,
+    JSON.stringify({ flagged: r.flagged, score: r.score }));
+}
+
 console.log(`\n${results.filter(r => r.pass).length}/${results.length} checks passed.`);
 if (results.some(r => !r.pass)) process.exitCode = 1;
