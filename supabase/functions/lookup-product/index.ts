@@ -88,9 +88,18 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "lookup_failed" }), { status: 502, headers });
   }
 
-  // status === 1 means Open Beauty Facts has this barcode; 0 (or no
-  // product) means it genuinely doesn't — trust the body's own status
-  // field over whatever HTTP status it arrived on.
+  // status === 1 means Open Beauty Facts has this barcode; 0 means it
+  // genuinely doesn't — trust the body's own status field over
+  // whatever HTTP status it arrived on, but ONLY when the body
+  // actually looks like a real OBF response (a numeric `status`
+  // field). Without this check, a non-2xx response carrying some
+  // OTHER valid JSON — a gateway/WAF error object with no `status`
+  // field, say — would fall through "data.status !== 1" (undefined
+  // !== 1 is true) and get silently misreported as found:false
+  // instead of surfaced as the genuine service error it actually is.
+  if (typeof data.status !== "number") {
+    return new Response(JSON.stringify({ error: "lookup_failed" }), { status: 502, headers });
+  }
   if (data.status !== 1 || !data.product) {
     return new Response(JSON.stringify({ found: false, barcode }), { headers });
   }
