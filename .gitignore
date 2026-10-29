@@ -5,3 +5,8 @@ node_modules/
 # not meant to be shared/committed.
 scripts/obf-coverage-barcodes.txt
 scripts/obf-coverage-results.json
+
+# Same, for scripts/compare-ingredient-sources.mjs's output — also your
+# own data, never committed. (It reuses obf-coverage-barcodes.txt above
+# as its input, so no separate input-file entry is needed here.)
+scripts/ingredient-source-comparison-results.json
