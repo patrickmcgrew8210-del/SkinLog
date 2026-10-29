@@ -1,9 +1,9 @@
 /* ══════════════════════════════════════════════
-   SCANNER — barcode scan → Open Beauty Facts lookup (Phase 3, Stage A).
-   Camera permission → continuous decode → lookup → raw result display.
-   No personalized analysis, no manual search/entry, no My Products
-   integration yet — those are Stage B/C/D. This stage only proves the
-   capture → decode → lookup pipeline end to end.
+   SCANNER — barcode scan → Open Beauty Facts lookup. Camera permission
+   → continuous decode → lookup, then hands off to js/analyzer.js: a
+   found product opens the analyzer's scored detail view directly, a
+   miss (not-found or a lookup error) opens its search/manual-entry
+   flow — this file owns only the camera/decode/lookup pipeline.
 ══════════════════════════════════════════════ */
 
 const SCAN_BARCODE_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e'];
@@ -143,27 +143,37 @@ async function lookUpBarcode(barcode) {
   }
 }
 
+/** A found product routes straight into the analyzer's detail/score
+ *  view — a dead-end "here's the raw data, scan again" screen isn't
+ *  useful on its own. A miss (not-found or a lookup error) routes into
+ *  the analyzer's search/manual-entry flow instead of stopping here:
+ *  a missing barcode match must never be a dead end. */
 function renderScanResult(result) {
+  if (result.found) {
+    closeScannerModal();
+    openAnalyzerFromScan(result);
+    return;
+  }
+
   const body = document.getElementById('scanner-result-body');
   if (!body) return;
 
   if (result.error) {
     body.innerHTML = `
       <p class="text-sm font-semibold text-bark">Couldn't reach the product database.</p>
-      <p class="text-xs text-bark-muted mt-1">Check your connection and try again.</p>
-      <button type="button" onclick="retryScan()" class="mt-3 text-[11px] font-bold text-sage-dark underline underline-offset-2">Try again</button>`;
-  } else if (!result.found) {
-    body.innerHTML = `
-      <p class="text-sm font-semibold text-bark">We don't have this product yet.</p>
-      <p class="text-xs text-bark-muted mt-1">Barcode ${escapeHtml(result.barcode || '')} isn't in Open Beauty Facts. Manual search and ingredient entry are coming in a future update.</p>
-      <button type="button" onclick="retryScan()" class="mt-3 text-[11px] font-bold text-sage-dark underline underline-offset-2">Scan again</button>`;
+      <p class="text-xs text-bark-muted mt-1">Check your connection and try again — or search/enter the product manually instead.</p>
+      <div class="flex gap-3 mt-3">
+        <button type="button" onclick="retryScan()" class="text-[11px] font-bold text-sage-dark underline underline-offset-2">Try again</button>
+        <button type="button" onclick="closeScannerModal(); openAnalyzerModal('search');" class="text-[11px] font-bold text-sage-dark underline underline-offset-2">Search or enter manually</button>
+      </div>`;
   } else {
     body.innerHTML = `
-      <p class="text-sm font-semibold text-bark">${escapeHtml(result.name || 'Unnamed product')}</p>
-      <p class="text-xs text-bark-muted mt-0.5">${escapeHtml(result.brand || 'Unknown brand')} · Barcode ${escapeHtml(result.barcode || '')}</p>
-      <p class="text-[10px] text-bark-muted mt-2 font-bold uppercase tracking-wide">${result.ingredientsAvailable ? 'Ingredients' : 'Ingredients not listed for this product'}</p>
-      ${result.ingredientsAvailable ? `<p class="text-xs text-bark-muted mt-1">${escapeHtml(result.ingredientsText)}</p>` : ''}
-      <button type="button" onclick="retryScan()" class="mt-3 text-[11px] font-bold text-sage-dark underline underline-offset-2">Scan another</button>`;
+      <p class="text-sm font-semibold text-bark">We don't have this product yet.</p>
+      <p class="text-xs text-bark-muted mt-1">Barcode ${escapeHtml(result.barcode || '')} isn't in Open Beauty Facts. You can still search a small starter catalog or enter it manually.</p>
+      <div class="flex gap-3 mt-3">
+        <button type="button" onclick="retryScan()" class="text-[11px] font-bold text-sage-dark underline underline-offset-2">Scan again</button>
+        <button type="button" onclick="closeScannerModal(); openAnalyzerModal('search');" class="text-[11px] font-bold text-sage-dark underline underline-offset-2">Search or enter manually</button>
+      </div>`;
   }
   document.getElementById('scanner-status').classList.add('hidden');
   document.getElementById('scanner-video-wrap').classList.add('hidden');

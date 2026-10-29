@@ -174,6 +174,15 @@ function renderProductRow(product, current) {
     ? `<button onclick="unarchiveProduct('${product.id}')" class="text-[11px] font-bold text-sage-dark underline underline-offset-2 flex-shrink-0">Unarchive</button>`
     : `<button onclick="deleteOrArchiveProduct('${product.id}')" class="text-[11px] font-bold text-blush-dark underline underline-offset-2 flex-shrink-0">${isUsed ? 'Archive' : 'Delete'}</button>`;
 
+  // Any product with an ingredient list (scanned, catalog-sourced, or
+  // manually entered via the analyzer) gets a link back into its
+  // scored detail view — always a fresh recompute, never the stale
+  // cached lastAnalysis, since the user's profile or routine may have
+  // changed since it was saved.
+  const analysisHtml = Array.isArray(product.ingredients) && product.ingredients.length
+    ? `<button onclick="reopenSavedAnalysis('${product.id}')" class="text-[11px] font-bold text-sage-dark underline underline-offset-2 mt-1.5 inline-block">${product.lastAnalysis ? `View Analysis (${product.lastAnalysis.score}/100)` : 'View Analysis'}</button>`
+    : '';
+
   return `
     <div class="card rounded-2xl p-3.5 ${product.archived ? 'opacity-60' : ''}">
       <div class="flex items-start justify-between gap-2">
@@ -187,6 +196,7 @@ function renderProductRow(product, current) {
         </div>
       </div>
       ${impactHtml}
+      ${analysisHtml}
     </div>`;
 }
 

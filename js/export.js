@@ -271,6 +271,7 @@ function exportBackup() {
     currentProducts: getCurrentProducts(),
     cycleTrackingEnabled: isCycleTrackingEnabled(),
     experiments: getExperiments(),
+    skinProfile: getSkinProfile(),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -340,6 +341,7 @@ function handleRestoreFile(input) {
           syncCycleFieldVisibility();
         }
         if (Array.isArray(data.experiments)) saveExperiments(data.experiments);
+        if (data.skinProfile) saveSkinProfile(data.skinProfile);
         renderHistory();
         hydrateDashboard();
         showToast('Backup restored', 'success');

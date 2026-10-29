@@ -75,6 +75,8 @@ document.addEventListener('keydown', e => {
     closeExperimentFormPopup();
     closeCompleteExperimentPopup();
     closeScannerModal();
+    closeAnalyzerModal();
+    closeSkinProfileEditor();
     closeAddProductPopup();
     closeCompareModal();
     closeComparePicker();
