@@ -31,6 +31,15 @@
 // scripts/obf-coverage-results.json (also gitignored) with the full
 // detail behind each line, in case you want to look closer at any one
 // barcode.
+//
+// A note on HTTP 404: this endpoint is documented (OBF's v3 API docs)
+// and independently observed to return a 404 WITH a JSON body for a
+// genuinely missing product, not just for a broken route or outage —
+// the sibling Open Food Facts / Open Pet Food Facts APIs (same engine)
+// do the same. This script reads that body and trusts its own
+// `status` field over the HTTP status code; a 404 only counts as a
+// service error here if its body isn't a recognizable not-found
+// response. See the comment on lookupOne() for the detail.
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -72,54 +81,95 @@ function loadBarcodes(inputPath) {
   return { barcodes, skippedInvalid };
 }
 
+/** Open Beauty Facts (and its sibling Open Food Facts / Open Pet Food
+ *  Facts — same underlying "Product Opener" engine) is documented
+ *  (the official v3 API docs state a missing product returns HTTP 404)
+ *  and independently observed in the wild to carry a real JSON body —
+ *  {"status":0,"status_verbose":"product not found",...} — on BOTH a
+ *  200 and a 404 for this endpoint. A 404 here is not automatically a
+ *  service failure: it is this API's documented way of saying "not
+ *  found" at least some of the time. So this function trusts the
+ *  parsed JSON body's own `status` field over the HTTP status code,
+ *  and only falls back to a genuine error classification when the body
+ *  itself doesn't parse as JSON or doesn't match either known shape —
+ *  that's the case a real service/API failure (a 5xx, a WAF block
+ *  page, a malformed response) actually looks like. */
 async function lookupOne(barcode) {
   const url = `https://world.openbeautyfacts.org/api/v2/product/${barcode}.json?fields=${OBF_FIELDS}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  let response;
+  let httpStatus = null;
+  let statusText = '';
+  let rawText;
   try {
-    response = await fetch(url, {
+    const response = await fetch(url, {
       headers: { 'User-Agent': USER_AGENT },
       signal: controller.signal,
     });
+    httpStatus = response.status;
+    statusText = response.statusText;
+    rawText = await response.text();
   } catch (err) {
     clearTimeout(timer);
     if (err.name === 'AbortError') {
-      return { barcode, outcome: 'timeout', detail: `No response within ${REQUEST_TIMEOUT_MS}ms` };
+      return { barcode, httpStatus, outcome: 'timeout', detail: `No response within ${REQUEST_TIMEOUT_MS}ms` };
     }
-    return { barcode, outcome: 'network_error', detail: String(err.message || err) };
+    return { barcode, httpStatus, outcome: 'network_error', detail: String(err.message || err) };
   }
   clearTimeout(timer);
 
-  if (!response.ok) {
-    return { barcode, outcome: 'http_error', detail: `HTTP ${response.status} ${response.statusText}` };
-  }
-
-  let data;
+  let data = null;
   try {
-    data = await response.json();
-  } catch (err) {
-    return { barcode, outcome: 'invalid_response', detail: `Response was not valid JSON: ${String(err.message || err)}` };
+    data = JSON.parse(rawText);
+  } catch {
+    // leave data null — handled in the fallback branch below
   }
 
-  if (data.status !== 1 || !data.product) {
-    return { barcode, outcome: 'not_found', detail: data.status_verbose || 'product not in database' };
+  if (data && typeof data === 'object') {
+    if (data.status === 1 && data.product) {
+      const p = data.product;
+      const name = typeof p.product_name === 'string' ? p.product_name.trim() : '';
+      const brand = typeof p.brands === 'string' ? p.brands.trim() : '';
+      const ingredientsText = typeof p.ingredients_text === 'string' ? p.ingredients_text.trim() : '';
+      const hasName = name.length > 0;
+      const hasBrand = brand.length > 0;
+      const hasIngredients = ingredientsText.length > 0;
+      const dataQualityFlags = [];
+      if (!hasName) dataQualityFlags.push('missing_name');
+      if (!hasBrand) dataQualityFlags.push('missing_brand');
+
+      return {
+        barcode,
+        httpStatus,
+        outcome: hasIngredients ? 'found_with_ingredients' : 'found_without_ingredients',
+        detail: `HTTP ${httpStatus} — name="${name || '(missing)'}" brand="${brand || '(missing)'}" ingredients_chars=${ingredientsText.length}`
+          + (dataQualityFlags.length ? ` — ⚠ ${dataQualityFlags.join(', ')} (found, but treat as low-confidence until manually checked)` : ''),
+        name, brand, hasName, hasBrand, hasIngredients, dataQualityFlags,
+      };
+    }
+
+    if (data.status === 0 || !data.product) {
+      // Confirmed not-found: the response body itself says so — via
+      // whichever HTTP status the server happened to wrap it in.
+      return {
+        barcode,
+        httpStatus,
+        outcome: 'not_found',
+        detail: `HTTP ${httpStatus} — confirmed not-found (status_verbose: "${data.status_verbose || 'product not found'}")`,
+      };
+    }
   }
 
-  const p = data.product;
-  const name = typeof p.product_name === 'string' ? p.product_name.trim() : '';
-  const brand = typeof p.brands === 'string' ? p.brands.trim() : '';
-  const ingredientsText = typeof p.ingredients_text === 'string' ? p.ingredients_text.trim() : '';
-  const hasNameAndBrand = name.length > 0 && brand.length > 0;
-  const hasIngredients = ingredientsText.length > 0;
-
-  return {
-    barcode,
-    outcome: hasIngredients ? 'found_with_ingredients' : 'found_without_ingredients',
-    detail: `name="${name || '(missing)'}" brand="${brand || '(missing)'}" ingredients_chars=${ingredientsText.length}`,
-    name, brand, hasNameAndBrand, hasIngredients,
-  };
+  // The body didn't parse as JSON, or parsed but matched neither known
+  // shape — a genuine service/API problem, not a confirmed not-found.
+  // Keep a short snippet (not the whole body) so it's possible to see
+  // what actually came back without dumping a full error page.
+  const snippet = (rawText || '').slice(0, 300).replace(/\s+/g, ' ').trim();
+  if (httpStatus >= 200 && httpStatus < 300) {
+    return { barcode, httpStatus, outcome: 'invalid_response', detail: `HTTP ${httpStatus} but the body didn't match the expected shape. Snippet: ${snippet || '(empty body)'}` };
+  }
+  return { barcode, httpStatus, outcome: 'http_error', detail: `HTTP ${httpStatus} ${statusText} — body wasn't a recognizable not-found response. Snippet: ${snippet || '(empty body)'}` };
 }
 
 function outcomeLabel(outcome) {
@@ -176,8 +226,16 @@ async function main() {
 
   const total = results.length;
   const totalFound = counts.found_with_ingredients + counts.found_without_ingredients;
+  // "Errors" now means a genuine service/API problem only — a 404 (or
+  // any other status) whose body explicitly confirmed status:0 is
+  // counted under not_found, not here. See lookupOne()'s comment.
   const totalErrors = counts.http_error + counts.invalid_response + counts.timeout + counts.network_error;
   const pct = (n) => total > 0 ? `${((n / total) * 100).toFixed(0)}%` : '0%';
+
+  const foundWithDataQualityFlags = results.filter(r =>
+    (r.outcome === 'found_with_ingredients' || r.outcome === 'found_without_ingredients') &&
+    r.dataQualityFlags && r.dataQualityFlags.length > 0
+  );
 
   const summary = [
     '',
@@ -185,13 +243,15 @@ async function main() {
     'SUMMARY — copy everything below this line back to report results',
     '═══════════════════════════════════════════════',
     `Total tested: ${total}`,
-    `Found: ${totalFound} (${pct(totalFound)})`,
+    `Found (confirmed via the response body, any HTTP status): ${totalFound} (${pct(totalFound)})`,
     `  - with ingredients listed: ${counts.found_with_ingredients} (${pct(counts.found_with_ingredients)} of total)`,
     `  - without ingredients listed: ${counts.found_without_ingredients} (${pct(counts.found_without_ingredients)} of total)`,
-    `Not found: ${counts.not_found} (${pct(counts.not_found)})`,
-    `Errors: ${totalErrors} (${pct(totalErrors)})`,
-    `  - HTTP errors: ${counts.http_error}`,
-    `  - invalid responses: ${counts.invalid_response}`,
+    `  - of those found, missing name and/or brand (data-quality flag — don't count as clean evidence without checking manually): ${foundWithDataQualityFlags.length}`,
+    foundWithDataQualityFlags.length > 0 ? foundWithDataQualityFlags.map(r => `      ⚠ ${r.barcode}: ${r.dataQualityFlags.join(', ')}`).join('\n') : null,
+    `Not found (confirmed via the response body — a status:0 result, regardless of whether it arrived as HTTP 200 or 404): ${counts.not_found} (${pct(counts.not_found)})`,
+    `Genuine service/API errors (body did not confirm either found or not-found): ${totalErrors} (${pct(totalErrors)})`,
+    `  - HTTP errors (non-2xx with an unrecognized or unparseable body): ${counts.http_error}`,
+    `  - invalid responses (2xx but an unrecognized or unparseable body): ${counts.invalid_response}`,
     `  - timeouts: ${counts.timeout}`,
     `  - network errors: ${counts.network_error}`,
     skippedInvalid.length > 0 ? `Skipped (not a valid barcode format): ${skippedInvalid.length}` : null,
