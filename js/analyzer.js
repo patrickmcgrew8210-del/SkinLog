@@ -19,6 +19,8 @@ let _analyzerState = {
   view: 'search',
   searchQuery: '',
   searchCategory: 'all',
+  searchBrand: 'all',
+  searchTag: 'all',
   currentProduct: null,   // the product draft currently shown in 'detail' (not yet necessarily saved)
   editingProductId: null, // set when currentProduct corresponds to an existing My Products entry being re-viewed/edited
   isEditingIngredients: false,
@@ -29,6 +31,8 @@ function openAnalyzerModal(initialView, seedProduct) {
     view: initialView || 'search',
     searchQuery: '',
     searchCategory: 'all',
+    searchBrand: 'all',
+    searchTag: 'all',
     currentProduct: seedProduct || null,
     editingProductId: (seedProduct && seedProduct.__existingProductId) || null,
     isEditingIngredients: false,
@@ -56,8 +60,22 @@ function renderAnalyzerModal() {
 }
 
 /* ── Search / browse view ── */
+
+/** Honest per-row data-status badge: a stub (no ingredient list at
+ *  all) is labeled distinctly from a product that HAS an ingredient
+ *  list but hasn't been independently verified — conflating the two
+ *  would hide exactly the distinction this app is required to make
+ *  clear (an unavailable formula is never implied to be an average or
+ *  safe one). */
+function catalogRowBadge(p) {
+  if (p.ingredients && p.ingredients.length) {
+    return `<span class="text-[9px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-amber-50 text-amber-800 flex-shrink-0">Unverified</span>`;
+  }
+  return `<span class="text-[9px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-gray-100 text-gray-500 flex-shrink-0">No data yet</span>`;
+}
+
 function renderSearchView() {
-  const results = searchCatalog(_analyzerState.searchQuery, _analyzerState.searchCategory);
+  const results = searchCatalog(_analyzerState.searchQuery, _analyzerState.searchCategory, { brand: _analyzerState.searchBrand, tag: _analyzerState.searchTag });
   const chips = ['all', ...CATALOG_CATEGORIES].map(cat => {
     const label = cat === 'all' ? 'All' : CATALOG_CATEGORY_LABELS[cat];
     const active = _analyzerState.searchCategory === cat;
@@ -66,31 +84,41 @@ function renderSearchView() {
       ${escapeHtml(label)}</button>`;
   }).join('');
 
+  const brandOptions = ['all', ...getCatalogBrands()].map(b =>
+    `<option value="${escapeHtml(b)}" ${_analyzerState.searchBrand === b ? 'selected' : ''}>${b === 'all' ? 'All brands' : escapeHtml(b)}</option>`).join('');
+  const tagOptions = ['all', ...CATALOG_TAGS].map(t =>
+    `<option value="${escapeHtml(t)}" ${_analyzerState.searchTag === t ? 'selected' : ''}>${t === 'all' ? 'Any' : escapeHtml(CATALOG_TAG_LABELS[t])}</option>`).join('');
+
   const rows = results.map(p => `
     <button type="button" onclick="selectCatalogProduct('${p.id}')" class="w-full text-left card rounded-2xl p-3 flex items-center justify-between gap-2">
       <div>
         <p class="text-sm font-semibold text-bark">${escapeHtml(p.name)}</p>
         <p class="text-[11px] text-bark-muted mt-0.5">${escapeHtml(p.brand)} · ${escapeHtml(CATALOG_CATEGORY_LABELS[p.catalogCategory])}</p>
       </div>
-      <span class="text-[9px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-amber-50 text-amber-800 flex-shrink-0">Unverified</span>
+      ${catalogRowBadge(p)}
     </button>`).join('');
 
   const emptyState = `
     <div class="flex flex-col items-center justify-center py-6 gap-2 text-center">
       <span class="text-2xl">🔍</span>
-      <p class="text-sm font-semibold text-bark">No matching products in the starter catalog</p>
-      <p class="text-xs text-bark-muted" style="max-width:260px;">This catalog is small on purpose — enter the product manually instead.</p>
+      <p class="text-sm font-semibold text-bark">No matching products found</p>
+      <p class="text-xs text-bark-muted" style="max-width:260px;">Try a different filter, or enter the product manually instead.</p>
     </div>`;
 
   return `
     <input id="analyzer-search-input" type="text" placeholder="Search brand or product name…" value="${escapeHtml(_analyzerState.searchQuery)}"
       oninput="handleAnalyzerSearchInput(this.value)"
       style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1.5px solid #f0e8e6;background:#fff;font-family:'DM Sans',sans-serif;font-size:14px;color:#3a2e28;outline:none;margin-bottom:10px;" />
-    <div class="flex gap-2 overflow-x-auto pb-1 mb-3" style="scrollbar-width:none;">${chips}</div>
+    <div class="flex gap-2 overflow-x-auto pb-1 mb-2" style="scrollbar-width:none;">${chips}</div>
+    <div class="flex gap-2 mb-3">
+      <select onchange="setAnalyzerBrand(this.value)" style="flex:1;min-width:0;padding:9px 10px;border-radius:10px;border:1.5px solid #f0e8e6;background:#fff;font-family:'DM Sans',sans-serif;font-size:12px;color:#3a2e28;outline:none;">${brandOptions}</select>
+      <select onchange="setAnalyzerTag(this.value)" style="flex:1;min-width:0;padding:9px 10px;border-radius:10px;border:1.5px solid #f0e8e6;background:#fff;font-family:'DM Sans',sans-serif;font-size:12px;color:#3a2e28;outline:none;">${tagOptions}</select>
+    </div>
+    <p class="text-[10px] text-bark-muted mb-3">${results.length} product${results.length === 1 ? '' : 's'} · ${results.filter(p => p.ingredients && p.ingredients.length).length} with ingredient data</p>
     <div class="space-y-2 mb-4">${results.length ? rows : emptyState}</div>
     <button type="button" onclick="openManualEntryView()"
       style="width:100%;text-align:left;padding:12px 14px;border-radius:12px;border:1.5px dashed rgba(212,144,138,0.4);background:#fff;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;color:#b5706a;">
-      + Can't find it? Enter it manually
+      + Can't find it, or no ingredient data yet? Enter it manually
     </button>`;
 }
 
@@ -105,6 +133,14 @@ function handleAnalyzerSearchInput(value) {
 
 function setAnalyzerCategory(cat) {
   _analyzerState.searchCategory = cat;
+  renderAnalyzerModal();
+}
+function setAnalyzerBrand(brand) {
+  _analyzerState.searchBrand = brand;
+  renderAnalyzerModal();
+}
+function setAnalyzerTag(tag) {
+  _analyzerState.searchTag = tag;
   renderAnalyzerModal();
 }
 
@@ -183,7 +219,10 @@ function selectCatalogProduct(catalogId) {
   if (!entry) return;
   _analyzerState.currentProduct = {
     brand: entry.brand, name: entry.name, catalogCategory: entry.catalogCategory,
-    ingredients: entry.ingredients.slice(), ingredientsComplete: entry.ingredientsComplete,
+    // entry.ingredients is null for a real product this catalog has no
+    // usable formula for yet — never defaulted to [] (which would read
+    // as "confirmed zero ingredients") or guessed at.
+    ingredients: entry.ingredients ? entry.ingredients.slice() : null, ingredientsComplete: entry.ingredientsComplete,
     verified: entry.verified, dataSource: entry.dataSource, dataSourceNote: entry.dataSourceNote,
     catalogId: entry.id, barcode: null, catalogNote: entry.note || null,
     corroboration: entry.corroboration || null, knownIssues: entry.knownIssues || [],
@@ -220,7 +259,10 @@ function getOtherActiveIngredientLists(excludeProductId) {
 
 function dataQualityBadge(product) {
   if (product.verified) return `<span class="text-[9px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-sage-light text-sage-dark">Verified</span>`;
-  const label = { manual: 'User-entered', user_edited: 'User-edited', scanned: 'Unverified (scanned)', catalog_unverified: 'Unverified (catalog)' }[product.dataSource] || 'Unverified';
+  if (!product.ingredients || !product.ingredients.length) {
+    return `<span class="text-[9px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-gray-100 text-gray-500">Formula unavailable</span>`;
+  }
+  const label = { manual: 'User-entered', user_edited: 'User-edited', scanned: 'Unverified (scanned)', catalog_unverified: 'Unverified (catalog)', corroborated_secondary: 'Unverified (cross-checked)' }[product.dataSource] || 'Unverified';
   return `<span class="text-[9px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-amber-50 text-amber-800">${escapeHtml(label)}</span>`;
 }
 
@@ -262,9 +304,21 @@ function renderDetailView() {
         <p class="text-xs text-bark-muted mt-1">${escapeHtml(result.reason)} Add an ingredient list above to get one.</p>
       </div>`;
   } else {
+    const SKIN_PROFILE_FIELD_LABELS_UI = { skinType: 'skin type', acneTypes: 'acne type', goals: 'skin goals' };
+    const missingProfileHtml = result.missingProfileFields.length
+      ? `<div class="mt-3 p-3 rounded-xl flex items-start gap-2" style="background:#f2e0de;">
+          <span class="text-base">🧬</span>
+          <div class="flex-1">
+            <p class="text-xs font-semibold text-blush-dark">Add your ${result.missingProfileFields.map(f => SKIN_PROFILE_FIELD_LABELS_UI[f]).join(', ')} for a more personalized score</p>
+            <button type="button" onclick="openSkinProfileEditor()" class="text-[11px] font-bold text-sage-dark underline underline-offset-2 mt-1">Complete your skin profile</button>
+          </div>
+        </div>` : '';
     const positivesHtml = result.positives.length
-      ? `<div class="mt-3"><p class="text-[10px] font-bold uppercase tracking-wide text-sage-dark">May support your goals</p>
-          ${result.positives.map(p => `<p class="text-xs text-bark-muted mt-1">• <strong>${escapeHtml(p.ingredient)}</strong> — ${escapeHtml(p.explanation)}</p>`).join('')}</div>` : '';
+      ? `<div class="mt-3"><p class="text-[10px] font-bold uppercase tracking-wide text-sage-dark">Supports your goals/acne type</p>
+          ${result.positives.map(p => `<p class="text-xs text-bark-muted mt-1">• <strong>${escapeHtml(p.ingredient)}</strong> — ${escapeHtml(p.explanation)}${p.affectsScore === false ? ' <em>(already at the maximum credit for this score)</em>' : ''}</p>`).join('')}</div>` : '';
+    const generalPositivesHtml = result.generalPositives.length
+      ? `<div class="mt-3"><p class="text-[10px] font-bold uppercase tracking-wide text-bark-muted">Other generally beneficial ingredients</p>
+          ${result.generalPositives.map(p => `<p class="text-xs text-bark-muted mt-1">• <strong>${escapeHtml(p.ingredient)}</strong> — ${escapeHtml(p.explanation)}${p.affectsScore === false ? ' <em>(already at the maximum credit for this score)</em>' : ''}</p>`).join('')}</div>` : '';
     const flaggedHtml = result.flagged.length
       ? `<div class="mt-3"><p class="text-[10px] font-bold uppercase tracking-wide text-blush-dark">Flagged for your sensitivities</p>
           ${result.flagged.map(f => `<p class="text-xs text-bark-muted mt-1">• <strong>${escapeHtml(f.ingredient)}</strong> — ${escapeHtml(f.reason)}${f.affectsScore === false ? ' <em>(already at the maximum penalty for this score)</em>' : ''}</p>`).join('')}</div>` : '';
@@ -276,6 +330,8 @@ function renderDetailView() {
           <p class="text-xs text-bark-muted mt-1">${escapeHtml(result.unknownIngredients.join(', '))} — not in our reference table, not scored either way.</p></div>` : '';
     const routineOverlapHtml = result.routineOverlap
       ? `<div class="mt-3 p-2.5 rounded-xl" style="background:#fef3c7;"><p class="text-xs" style="color:#92400e;">⚠ ${escapeHtml(result.routineOverlap.explanation)}</p></div>` : '';
+    const acneAdvisoryHtml = result.acneAdvisory
+      ? `<div class="mt-3 p-2.5 rounded-xl" style="background:#eef2f7;"><p class="text-xs" style="color:#3a4f6b;">ℹ ${escapeHtml(result.acneAdvisory)}</p></div>` : '';
 
     scoreBlock = `
       <div class="rounded-2xl p-4" style="background:#faf7f4;">
@@ -288,7 +344,7 @@ function renderDetailView() {
         </div>
         <div class="w-full h-2 rounded-full bg-white mt-3 overflow-hidden"><div class="h-full rounded-full" style="width:${result.score}%;background:${scoreBarColor(result.score)};"></div></div>
         <p class="text-[11px] text-bark-muted mt-3 italic">${escapeHtml(result.explanation)}</p>
-        ${positivesHtml}${flaggedHtml}${tradeoffsHtml}${routineOverlapHtml}${unknownHtml}
+        ${missingProfileHtml}${acneAdvisoryHtml}${positivesHtml}${generalPositivesHtml}${flaggedHtml}${tradeoffsHtml}${routineOverlapHtml}${unknownHtml}
       </div>`;
   }
 
@@ -307,6 +363,8 @@ function renderDetailView() {
     </div>
     ${product.catalogNote ? `<p class="text-[11px] text-bark-muted mt-1 italic">${escapeHtml(product.catalogNote)}</p>` : ''}
     ${product.corroboration ? `<p class="text-[10px] mt-1.5 px-2 py-1 rounded-lg inline-block" style="background:#f0e8e6;color:#7a6055;">Cross-checked against secondary sources ${escapeHtml(product.corroboration.checkedDate)} (${escapeHtml(product.corroboration.confidence)} confidence) — still not independently verified against an official source.</p>` : ''}
+    ${(product.sourceUrls || []).length ? `<p class="text-[10px] text-bark-muted mt-1">Sources checked: ${product.sourceUrls.map(u => { try { return escapeHtml(new URL(u).hostname.replace(/^www\./, '')); } catch { return ''; } }).filter(Boolean).join(', ')}</p>` : ''}
+    ${!product.ingredients || !product.ingredients.length ? `<p class="text-[11px] mt-1.5 px-2.5 py-1.5 rounded-lg" style="background:#f3f4f6;color:#4b5563;">This product's ingredient list isn't available yet. You can still track it, and enter its ingredients manually any time once you have them, to get a compatibility score.</p>` : ''}
     ${(product.knownIssues || []).length ? product.knownIssues.map(issue => `<p class="text-[11px] mt-1.5 px-2.5 py-1.5 rounded-lg" style="background:#fef3c7;color:#92400e;">⚠ ${escapeHtml(issue)}</p>`).join('') : ''}
     <div class="mt-3">
       <p class="text-[10px] font-bold uppercase tracking-wide text-bark-muted">Ingredients</p>
@@ -446,10 +504,25 @@ function openSkinProfileEditor() {
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:24px;max-width:340px;width:calc(100% - 40px);margin:0 auto;padding:24px;max-height:85vh;overflow-y:auto;box-shadow:0 12px 40px rgba(58,46,40,0.2);">
       <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:#3a2e28;margin:0 0 4px;">Your skin profile</h3>
-      <p style="font-size:12px;color:#9e8a80;margin:0 0 14px;">Optional — used only to personalize the compatibility score. Never sent anywhere external.</p>
+      <p style="font-size:12px;color:#9e8a80;margin:0 0 14px;">Optional — used only to personalize the compatibility score. Never sent anywhere external. Skip anything you'd rather not answer.</p>
 
-      <label style="display:block;font-size:11px;font-weight:700;color:#9e8a80;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Goals</label>
-      <div style="margin-bottom:12px;">
+      <label style="display:block;font-size:11px;font-weight:700;color:#9e8a80;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Skin type <span style="font-weight:500;text-transform:none;">(optional)</span></label>
+      <select id="sl-skin-type-select" style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1.5px solid #f0e8e6;background:#faf7f4;font-size:14px;outline:none;margin-bottom:14px;">
+        <option value="">Not set</option>
+        ${SKIN_TYPES.map(t => `<option value="${t}" ${profile.skinType === t ? 'selected' : ''}>${escapeHtml(SKIN_TYPE_LABELS[t])}</option>`).join('')}
+      </select>
+
+      <label style="display:block;font-size:11px;font-weight:700;color:#9e8a80;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Acne type <span style="font-weight:500;text-transform:none;">(select all that apply)</span></label>
+      <div style="margin-bottom:14px;">
+        ${SKIN_ACNE_TYPES.map(a => `
+          <label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;color:#3a2e28;">
+            <input type="checkbox" class="sl-skin-acne-cb" value="${a}" data-unsure="${a === 'unsure_or_none'}" ${profile.acneTypes.includes(a) ? 'checked' : ''} onchange="handleSkinProfileAcneCheckboxChange(this)" />
+            ${escapeHtml(SKIN_ACNE_TYPE_LABELS[a])}
+          </label>`).join('')}
+      </div>
+
+      <label style="display:block;font-size:11px;font-weight:700;color:#9e8a80;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Goals <span style="font-weight:500;text-transform:none;">(select all that apply)</span></label>
+      <div style="margin-bottom:14px;">
         ${SKIN_GOALS.map(g => `
           <label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;color:#3a2e28;">
             <input type="checkbox" class="sl-skin-goal-cb" value="${g}" ${profile.goals.includes(g) ? 'checked' : ''} />
@@ -457,15 +530,18 @@ function openSkinProfileEditor() {
           </label>`).join('')}
       </div>
 
-      <label style="display:block;font-size:11px;font-weight:700;color:#9e8a80;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Skin type <span style="font-weight:500;text-transform:none;">(optional)</span></label>
-      <select id="sl-skin-type-select" style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1.5px solid #f0e8e6;background:#faf7f4;font-size:14px;outline:none;margin-bottom:12px;">
-        <option value="">Not set</option>
-        ${SKIN_TYPES.map(t => `<option value="${t}" ${profile.skinType === t ? 'selected' : ''}>${escapeHtml(SKIN_TYPE_LABELS[t])}</option>`).join('')}
-      </select>
-
-      <label style="display:block;font-size:11px;font-weight:700;color:#9e8a80;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Sensitivities / ingredients to avoid <span style="font-weight:500;text-transform:none;">(comma-separated)</span></label>
+      <label style="display:block;font-size:11px;font-weight:700;color:#9e8a80;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Sensitivities / ingredients to avoid <span style="font-weight:500;text-transform:none;">(comma-separated, optional)</span></label>
       <textarea id="sl-skin-sensitivities" rows="2" maxlength="500" placeholder="e.g. fragrance, lanolin"
-        style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1.5px solid #f0e8e6;background:#faf7f4;font-size:13px;outline:none;margin-bottom:16px;resize:vertical;">${escapeHtml(profile.sensitivities.join(', '))}</textarea>
+        style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1.5px solid #f0e8e6;background:#faf7f4;font-size:13px;outline:none;margin-bottom:12px;resize:vertical;">${escapeHtml(profile.sensitivities.join(', '))}</textarea>
+
+      <label style="display:flex;align-items:center;gap:8px;padding:8px 0;font-size:13px;color:#3a2e28;margin-bottom:10px;">
+        <input type="checkbox" id="sl-skin-easily-irritated" ${profile.easilyIrritated ? 'checked' : ''} />
+        My skin is easily irritated
+      </label>
+
+      <label style="display:block;font-size:11px;font-weight:700;color:#9e8a80;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Notes <span style="font-weight:500;text-transform:none;">(optional, just for you)</span></label>
+      <textarea id="sl-skin-notes" rows="2" maxlength="${SKIN_PROFILE_NOTES_MAX_LENGTH}" placeholder="Anything else worth remembering"
+        style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1.5px solid #f0e8e6;background:#faf7f4;font-size:13px;outline:none;margin-bottom:16px;resize:vertical;">${escapeHtml(profile.notes)}</textarea>
 
       <div style="display:flex;gap:10px;">
         <button id="sl-skin-profile-cancel" style="flex:1;padding:12px;border-radius:14px;border:1.5px solid #f0e8e6;background:#fff;font-weight:700;font-size:13px;color:#7a6055;">Cancel</button>
@@ -477,11 +553,32 @@ function openSkinProfileEditor() {
   document.getElementById('sl-skin-profile-cancel').onclick = closeSkinProfileEditor;
   document.getElementById('sl-skin-profile-save').onclick = () => {
     const goals = Array.from(document.querySelectorAll('.sl-skin-goal-cb:checked')).map(cb => cb.value);
+    const acneTypes = Array.from(document.querySelectorAll('.sl-skin-acne-cb:checked')).map(cb => cb.value);
     const skinType = document.getElementById('sl-skin-type-select').value || null;
     const sensitivities = parseIngredientList(document.getElementById('sl-skin-sensitivities').value);
-    if (!saveSkinProfile({ goals, skinType, sensitivities })) return;
+    const easilyIrritated = document.getElementById('sl-skin-easily-irritated').checked;
+    const notes = document.getElementById('sl-skin-notes').value.slice(0, SKIN_PROFILE_NOTES_MAX_LENGTH);
+    if (!saveSkinProfile({ goals, acneTypes, skinType, sensitivities, easilyIrritated, notes })) return;
     closeSkinProfileEditor();
     showToast('Skin profile saved', 'success');
     if (_analyzerState.view === 'detail') renderAnalyzerModal(); // rescore immediately against the new profile
+    if (typeof hydrateSkinProfileBanner === 'function') hydrateSkinProfileBanner();
   };
+}
+
+/** 'unsure_or_none' is mutually exclusive with every specific acne-type
+ *  checkbox — nobody should end up with "I don't have acne" AND
+ *  "cystic acne" both checked at once. Checking one side clears the
+ *  other, in whichever direction the user just clicked. */
+function handleSkinProfileAcneCheckboxChange(checkbox) {
+  if (!checkbox.checked) return;
+  const isUnsure = checkbox.dataset.unsure === 'true';
+  document.querySelectorAll('.sl-skin-acne-cb').forEach(cb => {
+    if (cb === checkbox) return;
+    const cbIsUnsure = cb.dataset.unsure === 'true';
+    // Checking "unsure/none" clears every specific type; checking a
+    // specific type clears "unsure/none" — but two specific types can
+    // both stay checked (that's a real, allowed multi-select).
+    if (isUnsure || cbIsUnsure) cb.checked = false;
+  });
 }

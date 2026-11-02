@@ -93,6 +93,9 @@ function hydrateDashboard() {
   const badgeEl    = document.getElementById('dashboard-log-badge');
   const statusEl   = document.getElementById('dashboard-log-status');
 
+  // ── Skin profile invite banner ──
+  hydrateSkinProfileBanner();
+
   // ── Reminder banner ──
   const banner = document.getElementById('reminder-banner');
   if (banner) {

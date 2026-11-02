@@ -4,7 +4,52 @@
    found product opens the analyzer's scored detail view directly, a
    miss (not-found or a lookup error) opens its search/manual-entry
    flow — this file owns only the camera/decode/lookup pipeline.
+
+   STATUS: barcode lookup is temporarily disabled (Open Beauty Facts
+   coverage/reliability wasn't good enough to ship). The entry point in
+   the account popup now opens openScannerComingSoon() below instead of
+   openScannerModal() — nothing past this comment block is called from
+   the UI right now, but it's left fully intact (camera permission,
+   BarcodeDetector/ZXing decode, the lookup-product Edge Function call)
+   so re-enabling later is a one-line change back to openScannerModal().
 ══════════════════════════════════════════════ */
+
+/** Entry point from the account popup while barcode lookup is
+ *  disabled. A small centered overlay (same pattern as the skin-profile
+ *  editor in js/analyzer.js) — never touches the camera, never calls
+ *  the lookup Edge Function. Routes "find it another way" straight into
+ *  the analyzer's search/manual-entry flow, which is always available. */
+function closeScannerComingSoon() {
+  document.getElementById('sl-scanner-soon-overlay')?.remove();
+}
+function openScannerComingSoon() {
+  closeScannerComingSoon();
+  const overlay = document.createElement('div');
+  overlay.id = 'sl-scanner-soon-overlay';
+  overlay.className = 'modal-overlay';
+  overlay.style.zIndex = '270';
+  overlay.style.alignItems = 'center';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:24px;max-width:320px;width:calc(100% - 40px);margin:0 auto;padding:28px 24px;text-align:center;box-shadow:0 12px 40px rgba(58,46,40,0.2);">
+      <div style="width:56px;height:56px;border-radius:18px;background:linear-gradient(135deg,#f2e0de,#d4908a);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+        <svg width="26" height="26" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7V5a2 2 0 012-2h2M3 17v2a2 2 0 002 2h2M21 7V5a2 2 0 00-2-2h-2M21 17v2a2 2 0 01-2 2h-2M7 8v8M11 8v8M14 8v8M17 8v8"/></svg>
+      </div>
+      <p style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#b5706a;background:#f2e0de;display:inline-block;padding:4px 10px;border-radius:999px;margin-bottom:10px;">Coming Soon</p>
+      <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:#3a2e28;margin:0 0 8px;">Barcode scanning is on its way</h3>
+      <p style="font-size:13px;color:#7a6055;line-height:1.5;margin:0 0 20px;">We're still working on making barcode product lookup reliable enough to ship. For now, you can search our product catalog or enter a product's ingredients by hand — both get you the same personalized compatibility score.</p>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button id="sl-scanner-soon-analyze" style="width:100%;padding:12px;border-radius:14px;border:none;background:linear-gradient(110deg,#b5706a,#d4908a);font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;color:#fff;">Search or enter a product</button>
+        <button id="sl-scanner-soon-close" style="width:100%;padding:12px;border-radius:14px;border:1.5px solid #f0e8e6;background:#fff;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;color:#7a6055;">Maybe later</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeScannerComingSoon(); });
+  document.getElementById('sl-scanner-soon-close').onclick = closeScannerComingSoon;
+  document.getElementById('sl-scanner-soon-analyze').onclick = () => {
+    closeScannerComingSoon();
+    openAnalyzerModal('search');
+  };
+}
 
 const SCAN_BARCODE_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e'];
 const SCAN_POLL_INTERVAL_MS = 300;

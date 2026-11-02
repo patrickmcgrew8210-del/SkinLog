@@ -221,13 +221,23 @@ function promptRename() {
         <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.5 3h5M12 3v6m-3.5 0h7l2.5 9.5a2 2 0 01-2 2.5h-7.5a2 2 0 01-2-2.5L8.5 9z"/></svg>
         My Experiments
       </button>
-      <button onclick="openScannerModal(); document.getElementById('account-popup')?.remove();" style="width:100%;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#7a6055;">
-        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7V5a2 2 0 012-2h2M3 17v2a2 2 0 002 2h2M21 7V5a2 2 0 00-2-2h-2M21 17v2a2 2 0 01-2 2h-2M7 8v8M11 8v8M14 8v8M17 8v8"/></svg>
-        Scan Product
+      <button onclick="openScannerComingSoon(); document.getElementById('account-popup')?.remove();" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#7a6055;">
+        <span style="display:flex;align-items:center;gap:8px;">
+          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7V5a2 2 0 012-2h2M3 17v2a2 2 0 002 2h2M21 7V5a2 2 0 00-2-2h-2M21 17v2a2 2 0 01-2 2h-2M7 8v8M11 8v8M14 8v8M17 8v8"/></svg>
+          Scan Product
+        </span>
+        <span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:#b5706a;background:#f2e0de;padding:3px 7px;border-radius:999px;flex-shrink:0;">Coming Soon</span>
       </button>
       <button onclick="openAnalyzerModal('search'); document.getElementById('account-popup')?.remove();" style="width:100%;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#7a6055;">
         <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35"/></svg>
         Analyze a Product
+      </button>
+      <button onclick="openSkinProfileEditor(); document.getElementById('account-popup')?.remove();" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#7a6055;">
+        <span style="display:flex;align-items:center;gap:8px;">
+          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2a5 5 0 00-5 5c0 2 1 3 1 5 0 3-3 4-3 7a3 3 0 003 3c2 0 2-2 4-2s2 2 4 2a3 3 0 003-3c0-3-3-4-3-7 0-2 1-3 1-5a5 5 0 00-5-5z"/></svg>
+          Skin Profile
+        </span>
+        ${isSkinProfileCoreComplete(getSkinProfile()) ? '' : '<span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:#b5706a;background:#f2e0de;padding:3px 7px;border-radius:999px;flex-shrink:0;">Set up</span>'}
       </button>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f0e8e6;">

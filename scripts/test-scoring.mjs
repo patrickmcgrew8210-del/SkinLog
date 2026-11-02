@@ -48,14 +48,20 @@ const emptyProfile = { goals: [], sensitivities: [], skinType: null };
     JSON.stringify({ score: r.score, positives: r.positives.map(p => p.ingredient) }));
 }
 
-// 4. Explicit sensitivity match drops score hard and is flagged, not just noted
+// 4. Explicit sensitivity match drops score hard and is flagged, not
+// just noted. Compared against the SAME other ingredients without the
+// sensitive one present, rather than an absolute floor — v2's general
+// formula-quality layer means other real ingredients in the product
+// legitimately still contribute their own credit on top, so the
+// invariant to check is the SIZE of the sensitivity penalty itself,
+// not where the final number lands.
 {
-  const product = { ingredients: ['Fragrance', 'Glycerin', 'Niacinamide'], ingredientsComplete: true, verified: true };
   const profile = { goals: [], sensitivities: ['fragrance'], skinType: null };
-  const r = computeCompatibilityScore(product, profile);
-  record('An ingredient matching the user\'s own stated sensitivity is FLAGGED (not just a general caution) and drops the score sharply',
-    r.flagged.length === 1 && r.flagged[0].ingredient === 'Fragrance' && r.score <= 50 - 25,
-    JSON.stringify({ score: r.score, flagged: r.flagged }));
+  const withSensitive = computeCompatibilityScore({ ingredients: ['Fragrance', 'Glycerin', 'Niacinamide'], ingredientsComplete: true, verified: true }, profile);
+  const withoutSensitive = computeCompatibilityScore({ ingredients: ['Glycerin', 'Niacinamide'], ingredientsComplete: true, verified: true }, profile);
+  record('An ingredient matching the user\'s own stated sensitivity is FLAGGED (not just a general caution) and drops the score by the full penalty',
+    withSensitive.flagged.length === 1 && withSensitive.flagged[0].ingredient === 'Fragrance' && (withoutSensitive.score - withSensitive.score) >= 25,
+    JSON.stringify({ withSensitiveScore: withSensitive.score, withoutSensitiveScore: withoutSensitive.score, flagged: withSensitive.flagged }));
 }
 
 // 5. General caution (not personalized) applies a SMALL penalty, distinct from a flagged sensitivity
@@ -68,14 +74,21 @@ const emptyProfile = { goals: [], sensitivities: [], skinType: null };
     JSON.stringify({ score: r.score, tradeoffs: r.tradeoffs, flagged: r.flagged }));
 }
 
-// 6. debated_comedogenic NEVER affects the score
+// 6. The debated_comedogenic NOTE itself never affects the score —
+// checked by comparing Coconut Oil (occlusive, debated_comedogenic)
+// against Dimethicone (occlusive, no notes at all): both share the
+// same real, legitimate 'occlusive' role, which DOES earn ordinary
+// general-formula-quality credit in v2 (an occlusive ingredient
+// genuinely seals in moisture, note or no note) — so the two must
+// score IDENTICALLY, proving the debated reputation itself adds no
+// extra penalty beyond what any other occlusive ingredient would get.
 {
-  const withCoconut = computeCompatibilityScore({ ingredients: ['Coconut Oil', 'Glycerin'], ingredientsComplete: true, verified: true }, emptyProfile);
-  const withoutCoconut = computeCompatibilityScore({ ingredients: ['Glycerin'], ingredientsComplete: true, verified: true }, emptyProfile);
+  const withCoconut = computeCompatibilityScore({ ingredients: ['Coconut Oil'], ingredientsComplete: true, verified: true }, emptyProfile);
+  const withDimethicone = computeCompatibilityScore({ ingredients: ['Dimethicone'], ingredientsComplete: true, verified: true }, emptyProfile);
   const flaggedCorrectly = withCoconut.tradeoffs.some(t => t.ingredient === 'Coconut Oil' && t.note === 'debated_comedogenic' && t.affectsScore === false);
-  record('A debated_comedogenic ingredient (Coconut Oil) is surfaced but never moves the score',
-    flaggedCorrectly && withCoconut.score === withoutCoconut.score,
-    JSON.stringify({ withCoconut: withCoconut.score, withoutCoconut: withoutCoconut.score, tradeoffs: withCoconut.tradeoffs }));
+  record('A debated_comedogenic ingredient (Coconut Oil) is surfaced but the comedogenic reputation itself never moves the score beyond its ordinary occlusive-role credit',
+    flaggedCorrectly && withCoconut.score === withDimethicone.score,
+    JSON.stringify({ withCoconutScore: withCoconut.score, withDimethiconeScore: withDimethicone.score, tradeoffs: withCoconut.tradeoffs }));
 }
 
 // 7. Unknown ingredient is tracked, not silently dropped or scored
@@ -157,6 +170,111 @@ const emptyProfile = { goals: [], sensitivities: [], skinType: null };
   record('Once the sensitivity penalty cap is reached, further flagged matches are explicitly marked as not having moved the score further',
     r.flagged.length === 4 && affectingCount === 3 && notAffectingCount === 1,
     JSON.stringify({ flagged: r.flagged, score: r.score }));
+}
+
+// ═══ v2 personalization tests ═══
+
+// 15. The SAME product genuinely scores differently for two different
+// skin profiles — the core promise of personalization, checked
+// directly rather than inferred from smaller unit checks.
+{
+  const product = { ingredients: ['Niacinamide', 'Salicylic Acid', 'Glycerin', 'Fragrance'], ingredientsComplete: true, verified: true };
+  const profileA = { goals: ['oil_control'], sensitivities: [], skinType: 'oily', acneTypes: ['blackheads'] };
+  const profileB = { goals: [], sensitivities: ['fragrance'], skinType: 'dry', acneTypes: [] };
+  const rA = computeCompatibilityScore(product, profileA);
+  const rB = computeCompatibilityScore(product, profileB);
+  record('The same product scores differently for an oily/blackhead-focused profile vs. a dry/fragrance-sensitive profile',
+    rA.score !== rB.score, JSON.stringify({ scoreA: rA.score, scoreB: rB.score }));
+}
+
+// 16. Acne-type relevance is its own scoring input, distinct from the
+// acne_control goal — a selected acne type alone (no acne_control
+// goal) still credits an acne-relevant ingredient.
+{
+  const product = { ingredients: ['Salicylic Acid', 'Glycerin'], ingredientsComplete: true, verified: true };
+  const withAcneType = computeCompatibilityScore(product, { goals: [], sensitivities: [], skinType: null, acneTypes: ['blackheads'] });
+  const withoutAcneType = computeCompatibilityScore(product, { goals: [], sensitivities: [], skinType: null, acneTypes: [] });
+  record('Selecting a real acne type (without the acne_control goal) still credits an acne-relevant ingredient',
+    withAcneType.score > withoutAcneType.score && withAcneType.positives.some(p => p.ingredient === 'Salicylic Acid'),
+    JSON.stringify({ withAcneType: withAcneType.score, withoutAcneType: withoutAcneType.score }));
+}
+
+// 16b. "unsure/none" must NOT count as a real acne type for the
+// relevance bonus — nobody who declined to answer should be treated
+// as if they'd picked every acne type.
+{
+  const product = { ingredients: ['Salicylic Acid', 'Glycerin'], ingredientsComplete: true, verified: true };
+  const withUnsure = computeCompatibilityScore(product, { goals: [], sensitivities: [], skinType: null, acneTypes: ['unsure_or_none'] });
+  const withNone = computeCompatibilityScore(product, { goals: [], sensitivities: [], skinType: null, acneTypes: [] });
+  record('"I\'m not sure / I don\'t have acne" does not trigger the acne-type relevance bonus',
+    withUnsure.score === withNone.score, JSON.stringify({ withUnsure: withUnsure.score, withNone: withNone.score }));
+}
+
+// 17. Fragrance sensitivity matches SEMANTICALLY (by role), not just by
+// literal text — Linalool shares no text with "fragrance" but is a
+// recognized fragrance-role ingredient.
+{
+  const profile = { goals: [], sensitivities: ['fragrance'], skinType: null, acneTypes: [] };
+  const r = computeCompatibilityScore({ ingredients: ['Linalool', 'Glycerin'], ingredientsComplete: true, verified: true }, profile);
+  record('A fragrance sensitivity catches a specific fragrance allergen (Linalool) by role, not just by name match',
+    r.flagged.some(f => f.ingredient === 'Linalool' && f.affectsScore === true),
+    JSON.stringify(r.flagged));
+}
+
+// 18. "Easily irritated" amplifies the general-caution penalty for an
+// ingredient that ISN'T a personal sensitivity match.
+{
+  const product = { ingredients: ['Benzoyl Peroxide'], ingredientsComplete: true, verified: true };
+  const normal = computeCompatibilityScore(product, { goals: [], sensitivities: [], skinType: null, acneTypes: [], easilyIrritated: false });
+  const irritated = computeCompatibilityScore(product, { goals: [], sensitivities: [], skinType: null, acneTypes: [], easilyIrritated: true });
+  record('An "easily irritated" profile weighs a general-caution ingredient more heavily than the same ingredient for a non-irritated profile',
+    irritated.score < normal.score, JSON.stringify({ normal: normal.score, irritated: irritated.score }));
+}
+
+// 19. Oily skin + an occlusive ingredient produces an explicit
+// "may feel heavy" fit note, distinct from a general irritant caution
+// and distinct from a comedogenicity claim.
+{
+  const r = computeCompatibilityScore({ ingredients: ['Dimethicone'], ingredientsComplete: true, verified: true }, { goals: [], sensitivities: [], skinType: 'oily', acneTypes: [] });
+  record('Oily skin type + an occlusive ingredient surfaces a fit-specific "may feel heavy" note (explicitly not a clogged-pores claim)',
+    r.tradeoffs.some(t => t.note === 'oily_skin_fit' && /heavy/i.test(t.explanation) && /not a claim/i.test(t.explanation)),
+    JSON.stringify(r.tradeoffs));
+}
+
+// 20. Selecting cystic/nodular acne surfaces an informational advisory
+// that NEVER affects the score — it's guidance, not a scoring input.
+{
+  const product = { ingredients: ['Salicylic Acid', 'Glycerin'], ingredientsComplete: true, verified: true };
+  const withCystic = computeCompatibilityScore(product, { goals: [], sensitivities: [], skinType: null, acneTypes: ['cystic_nodular'] });
+  const withBlackheads = computeCompatibilityScore(product, { goals: [], sensitivities: [], skinType: null, acneTypes: ['blackheads'] });
+  record('Cystic/nodular acne shows a dermatologist-consultation advisory that does not change the score vs. an equivalent non-cystic acne-type profile',
+    typeof withCystic.acneAdvisory === 'string' && withCystic.acneAdvisory.length > 0 && withBlackheads.acneAdvisory === null && withCystic.score === withBlackheads.score,
+    JSON.stringify({ advisory: withCystic.acneAdvisory, cysticScore: withCystic.score, blackheadsScore: withBlackheads.score }));
+}
+
+// 21. missingProfileFields reports exactly what's unset, so the UI can
+// prompt specifically instead of vaguely.
+{
+  const r = computeCompatibilityScore({ ingredients: ['Glycerin'], ingredientsComplete: true, verified: true }, { goals: [], sensitivities: ['fragrance'], skinType: null, acneTypes: [] });
+  record('missingProfileFields lists every unset core field (skin type, acne type, goals — only a sensitivity was set here)',
+    r.missingProfileFields.includes('skinType') && r.missingProfileFields.includes('acneTypes') && r.missingProfileFields.includes('goals'),
+    JSON.stringify(r.missingProfileFields));
+}
+{
+  const r = computeCompatibilityScore({ ingredients: ['Glycerin'], ingredientsComplete: true, verified: true }, { goals: ['hydration'], sensitivities: [], skinType: 'dry', acneTypes: ['unsure_or_none'] });
+  record('missingProfileFields is empty once skin type, acne type, and at least one goal are all set',
+    r.missingProfileFields.length === 0, JSON.stringify(r.missingProfileFields));
+}
+
+// 22. A completely empty profile is NEVER "insufficient" as long as an
+// ingredient list exists — a provisional, low-confidence score is
+// always still returned, per the explicit "never block, just lower
+// confidence" requirement.
+{
+  const r = computeCompatibilityScore({ ingredients: ['Glycerin', 'Niacinamide', 'Water'], ingredientsComplete: true, verified: true }, { goals: [], sensitivities: [], skinType: null, acneTypes: [] });
+  record('An empty skin profile still returns a provisional score (never "insufficient") as long as ingredients exist',
+    r.insufficient === false && typeof r.score === 'number' && r.confidence === 'low' && r.profileIsEmpty === true,
+    JSON.stringify({ insufficient: r.insufficient, score: r.score, confidence: r.confidence }));
 }
 
 console.log(`\n${results.filter(r => r.pass).length}/${results.length} checks passed.`);
