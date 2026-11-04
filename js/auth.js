@@ -197,21 +197,40 @@ function promptRename() {
 
   const popup = document.createElement('div');
   popup.id = 'account-popup';
+  // Fixed position + a height constrained to whatever room is actually
+  // left below it (viewport height minus its own top/bottom offsets and
+  // the bottom safe-area inset on notched/gesture-nav phones), with the
+  // popup itself as a flex column so the header can stay put while only
+  // #account-popup-body scrolls. `100dvh` (dynamic viewport height)
+  // correctly accounts for mobile browser chrome that `100vh` doesn't;
+  // the plain `100vh` max-height declared first is the fallback for
+  // browsers that don't support `dvh` at all (an unsupported value
+  // invalidates the whole declaration, so the earlier one wins there,
+  // but the later one wins everywhere `dvh` IS supported — same
+  // technique already used for `.modal-sheet` elsewhere, just extended
+  // with a unit fallback since this is a `position:fixed` element in
+  // its own right rather than something inside the `.modal-overlay`
+  // flex centering that bounds those).
   popup.style.cssText = `
     position:fixed;top:72px;right:16px;z-index:400;
     background:#fff;border-radius:20px;
     box-shadow:0 8px 32px rgba(58,46,40,0.16);
-    border:1px solid #f0e8e6;width:220px;padding:16px;
+    border:1px solid #f0e8e6;width:220px;
+    max-width:calc(100vw - 32px);
+    max-height:calc(100vh - 88px - env(safe-area-inset-bottom, 0px));
+    max-height:calc(100dvh - 88px - env(safe-area-inset-bottom, 0px));
+    display:flex;flex-direction:column;overflow:hidden;
     font-family:'DM Sans',sans-serif;
     animation:lbFadeIn 0.18s ease both;`;
   popup.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f0e8e6;">
+    <div style="flex-shrink:0;padding:16px 16px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f0e8e6;">
       <div style="width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,#f2e0de,#d4908a);display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:#fff;flex-shrink:0;">${escapeHtml(initial)}</div>
       <div style="overflow:hidden;">
         <p style="margin:0;font-size:14px;font-weight:700;color:#3a2e28;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(userName)}</p>
         <p style="margin:0;font-size:11px;color:#9e8a80;">via ${escapeHtml(meta.label)}</p>
       </div>
     </div>
+    <div id="account-popup-body" style="flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:14px 16px 16px;">
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f0e8e6;">
       <button onclick="openProductsModal(); document.getElementById('account-popup')?.remove();" style="width:100%;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1.5px solid #f2e0de;background:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:#7a6055;">
         <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/></svg>
@@ -282,7 +301,8 @@ function promptRename() {
       <a href="privacy.html" target="_blank" rel="noopener" style="color:#c4b0a8;">Privacy</a>
       &nbsp;·&nbsp;
       <a href="terms.html" target="_blank" rel="noopener" style="color:#c4b0a8;">Terms</a>
-    </p>`;
+    </p>
+    </div>`;
 
   document.body.appendChild(popup);
   refreshBiometricToggleVisibility();
